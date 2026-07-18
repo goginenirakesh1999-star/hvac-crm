@@ -6,10 +6,13 @@ import { isValidTwilioRequest } from "@/lib/twilio";
 // Blueprint Task 2: when a tenant misses a call (no-answer/busy), have the
 // Retell AI agent immediately call the customer back.
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
-  const params = Object.fromEntries(
-    [...form.entries()].map(([k, v]) => [k, String(v)])
-  );
+  let params: Record<string, string>;
+  try {
+    const form = await req.formData();
+    params = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+  } catch {
+    return new NextResponse("expected form-encoded body", { status: 400 });
+  }
 
   if (
     !isValidTwilioRequest(

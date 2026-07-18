@@ -18,10 +18,13 @@ const HELP_TEXT =
 // commands to their business number; we create the Stripe artifact and text
 // the payment link straight to the customer.
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
-  const params = Object.fromEntries(
-    [...form.entries()].map(([k, v]) => [k, String(v)])
-  );
+  let params: Record<string, string>;
+  try {
+    const form = await req.formData();
+    params = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+  } catch {
+    return new NextResponse("expected form-encoded body", { status: 400 });
+  }
 
   if (
     !isValidTwilioRequest(
