@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rocky Solutions LLC — AI Communications for Home Service Businesses</title>
+    <meta
+      name="description"
+      content="Rocky Solutions LLC builds AI-powered phone answering, SMS dispatch, invoicing, and lead follow-up software for HVAC and home service companies across the United States."
+    />
+    <link rel="icon" type="image/svg+xml" href="/hvac-crm/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Rocky Solutions LLC" />
+    <meta property="og:title" content="Rocky Solutions LLC — AI Communications for Home Service Businesses" />
+    <meta property="og:description" content="AI phone answering, SMS dispatch, invoicing, and lead follow-up for HVAC and home service companies." />
+    <meta property="og:url" content="https://goginenirakesh1999-star.github.io/hvac-crm/" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- SPA redirect decode (pairs with 404.html) so deep links like /hvac-crm/privacy work on GitHub Pages -->
+    <script>
+      (function (l) {
+        if (l.search[1] === "/") {
+          var decoded = l.search
+            .slice(1)
+            .split("&")
+            .map(function (s) { return s.replace(/~and~/g, "&"); })
+            .join("?");
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      })(window.location);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
