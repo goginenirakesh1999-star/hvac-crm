@@ -10,7 +10,7 @@ export interface OwnerCommand {
 }
 
 const COMMAND_RE =
-  /^\s*(quote|invoice)\s+(\+?[\d\-\s().]+?)\s+\$?(\d+(?:\.\d{1,2})?)\s+(\S.*)$/is;
+  /^\s*(quote|invoice)\s+(\+?[\d\-\s().]+?)\s+\$?(\d+(?:\.\d{1,2})?)\s+(\S[\s\S]*)$/i;
 
 export function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
