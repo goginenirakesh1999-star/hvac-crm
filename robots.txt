@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://goginenirakesh1999-star.github.io/hvac-crm/sitemap.xml
