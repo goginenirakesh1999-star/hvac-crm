@@ -58,6 +58,8 @@ export interface Database {
           status: JobStatus;
           quoted_price: number | null;
           stripe_invoice_id: string | null;
+          review_sms_due_at: string | null;
+          review_sms_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -70,6 +72,8 @@ export interface Database {
           status?: JobStatus;
           quoted_price?: number | null;
           stripe_invoice_id?: string | null;
+          review_sms_due_at?: string | null;
+          review_sms_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

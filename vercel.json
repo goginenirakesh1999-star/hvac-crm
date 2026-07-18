@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/review-sms",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
