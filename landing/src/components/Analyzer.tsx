@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { analyze, normalizeUrl, reportToText, type Report } from "../lib/analyze";
-import { WEB3FORMS_ACCESS_KEY, COMPANY } from "../config";
+import { FORMSPREE_ENDPOINT } from "../config";
 
 type Status = "idle" | "running" | "done";
 
@@ -34,15 +34,13 @@ export default function Analyzer() {
     setReport(result);
     setStatus("done");
 
-    // Email the lead + report to the owner via Web3Forms (fire and forget).
+    // Email the lead + report to the owner via Formspree (fire and forget).
     try {
-      await fetch("https://api.web3forms.com/submit", {
+      await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: WEB3FORMS_ACCESS_KEY,
-          subject: `New website assessment lead: ${result.domain}`,
-          from_name: `${COMPANY} Website`,
+          _subject: `New website assessment lead: ${result.domain}`,
           name,
           email,
           phone,

@@ -1,19 +1,17 @@
 // Rocky Solutions LLC — site configuration.
 
-// Web3Forms access key. Get a free key at https://web3forms.com using
-// goginenirakesh1999@gmail.com, then paste it here. Reports are emailed to
-// the address tied to this key.
-export const WEB3FORMS_ACCESS_KEY = "REPLACE_WITH_WEB3FORMS_ACCESS_KEY";
+// Formspree endpoint. Report submissions are emailed to the address this
+// Formspree form is configured to deliver to (goginenirakesh1999@gmail.com).
+export const FORMSPREE_ENDPOINT = "https://formspree.io/f/xqerkekp";
 
 export const CALENDLY_URL = "https://calendly.com/goginenirakesh1999/intro-call";
 export const CONTACT_EMAIL = "goginenirakeshbabu99@gmail.com";
 export const REPORT_EMAIL = "goginenirakesh1999@gmail.com";
 export const COMPANY = "Rocky Solutions LLC";
 
-// ⚠️ REQUIRED before submitting to banks / payment processors / A2P 10DLC.
-// Replace these placeholders with your real registered business details.
-export const BUSINESS_PHONE = "REPLACE_WITH_BUSINESS_PHONE"; // e.g. "+1 (555) 123-4567"
-export const BUSINESS_ADDRESS = "REPLACE_WITH_REGISTERED_BUSINESS_ADDRESS"; // street, city, state, ZIP
+// Registered business details (shown to banks / payment processors / A2P reviewers).
+export const BUSINESS_PHONE = "+91 90638 55903";
+export const BUSINESS_ADDRESS = "728 Derby Way Dr, Wentzville, MO 63385";
 
 // Public site URL (update if you move to a custom domain).
 export const SITE_URL = "https://goginenirakesh1999-star.github.io/hvac-crm/";
