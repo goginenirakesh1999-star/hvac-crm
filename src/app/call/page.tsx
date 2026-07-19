@@ -358,15 +358,17 @@ export default function CallPage() {
 
               {/* Dialpad: manual dial when idle, DTMF keypad when live */}
               {status === "idle" && (
-                <input
-                  className="dial-display"
-                  value={dialInput}
-                  onChange={(e) => setDialInput(e.target.value)}
-                  placeholder="Type or tap a number"
-                />
-                <div className="hint" style={{ textAlign: "center", marginTop: -6, marginBottom: 6 }}>
-                  US: 10 digits. International: include country code (e.g. 91 for India → 919XXXXXXXXX).
-                </div>
+                <>
+                  <input
+                    className="dial-display"
+                    value={dialInput}
+                    onChange={(e) => setDialInput(e.target.value)}
+                    placeholder="Type or tap a number"
+                  />
+                  <div className="hint" style={{ textAlign: "center", marginTop: -6, marginBottom: 6 }}>
+                    US: 10 digits. International: include country code (e.g. 91 for India → 919XXXXXXXXX).
+                  </div>
+                </>
               )}
               {(status === "idle" || status === "live") && (
                 <>
