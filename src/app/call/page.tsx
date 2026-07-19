@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import "./call.css";
 
@@ -87,7 +88,8 @@ export default function CallPage() {
     };
   }, []);
 
-  async function connectDevice() {
+  async function connectDevice(): Promise<Device | null> {
+    if (deviceRef.current) return deviceRef.current;
     setError("");
     try {
       const res = await fetch("/api/voice/token");
@@ -99,8 +101,10 @@ export default function CallPage() {
       await device.register();
       deviceRef.current = device;
       setReady(true);
+      return device;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to connect device.");
+      return null;
     }
   }
 
@@ -136,14 +140,21 @@ export default function CallPage() {
   }
 
   async function callLead(lead: Lead) {
-    if (!deviceRef.current || status !== "idle") return;
+    if (status !== "idle") return;
+    setError("");
     setActiveId(lead.id);
     setOutcome(OUTCOMES[0]);
     setNotes("");
     setMuted(false);
     setStatus("connecting");
+    const device = await connectDevice();
+    if (!device) {
+      setStatus("idle");
+      setActiveId(null);
+      return;
+    }
     try {
-      const call = await deviceRef.current.connect({ params: { To: lead.number } });
+      const call = await device.connect({ params: { To: lead.number } });
       callRef.current = call;
       call.on("accept", () => {
         setStatus("live");
@@ -196,8 +207,51 @@ export default function CallPage() {
     setMuted(next);
   }
 
+  function mergeLeads(incoming: Lead[]) {
+    setLeads((prev) => {
+      const seen = new Set(prev.map((l) => l.number));
+      const merged = [...prev];
+      for (const l of incoming) {
+        if (!seen.has(l.number)) {
+          merged.push(l);
+          seen.add(l.number);
+        }
+      }
+      return merged;
+    });
+  }
+
   function loadLeads() {
-    setLeads(parseLeads(leadText));
+    mergeLeads(parseLeads(leadText));
+  }
+
+  // Import leads from a CSV or Excel (.xlsx/.xls) file. Any column that looks
+  // like a phone number is used as the number; other cells become the name.
+  async function importFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    try {
+      let text: string;
+      if (/\.(xlsx|xls)$/i.test(file.name)) {
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+        text = rows.map((r) => (Array.isArray(r) ? r.join(",") : "")).join("\n");
+      } else {
+        text = await file.text();
+      }
+      const parsed = parseLeads(text);
+      if (!parsed.length) {
+        setError("No valid phone numbers found in that file. Include a column with phone numbers.");
+        return;
+      }
+      mergeLeads(parsed);
+    } catch {
+      setError("Could not read that file. Use a CSV or Excel file with name and phone columns.");
+    } finally {
+      e.target.value = "";
+    }
   }
 
   function csv(): string {
@@ -252,8 +306,12 @@ export default function CallPage() {
             onChange={(e) => setLeadText(e.target.value)}
           />
           <div className="actions">
-            <button className="btn-ghost" onClick={loadLeads}>Load list</button>
-            {!ready && <button className="btn-blue" onClick={connectDevice}>Connect phone</button>}
+            <button className="btn-ghost" onClick={loadLeads}>Load pasted</button>
+            <label className="btn-ghost" style={{ cursor: "pointer" }}>
+              Import CSV / Excel
+              <input type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={importFile} style={{ display: "none" }} />
+            </label>
+            {!ready && <button className="btn-blue" onClick={() => connectDevice()}>Connect phone</button>}
             {ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
           </div>
           {leads.map((l) => (
@@ -264,7 +322,7 @@ export default function CallPage() {
               </div>
               <button
                 className="btn-green"
-                disabled={!ready || status !== "idle"}
+                disabled={status !== "idle"}
                 onClick={() => callLead(l)}
               >
                 Call
@@ -316,7 +374,7 @@ export default function CallPage() {
                   {status === "idle" && (
                     <div className="controls" style={{ marginTop: 12 }}>
                       <button className="btn-ghost" onClick={() => setDialInput((p) => p.slice(0, -1))} disabled={!dialInput}>⌫</button>
-                      <button className="btn-green" onClick={manualCall} disabled={!ready || !dialInput}>Call this number</button>
+                      <button className="btn-green" onClick={manualCall} disabled={!dialInput || status !== "idle"}>Call this number</button>
                     </div>
                   )}
                   {status === "live" && <div className="hint">Tap keys to send tones (e.g. phone menus)</div>}
