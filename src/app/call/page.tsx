@@ -36,9 +36,10 @@ interface LogEntry {
 
 function normalize(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
-  if (raw.trim().startsWith("+") && digits.length >= 10) return `+${digits}`;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (raw.trim().startsWith("+") && digits.length >= 8) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`; // US local
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`; // US with 1
+  if (digits.length >= 11 && digits.length <= 15) return `+${digits}`; // international w/ country code
   return null;
 }
 
@@ -363,6 +364,9 @@ export default function CallPage() {
                   onChange={(e) => setDialInput(e.target.value)}
                   placeholder="Type or tap a number"
                 />
+                <div className="hint" style={{ textAlign: "center", marginTop: -6, marginBottom: 6 }}>
+                  US: 10 digits. International: include country code (e.g. 91 for India → 919XXXXXXXXX).
+                </div>
               )}
               {(status === "idle" || status === "live") && (
                 <>
