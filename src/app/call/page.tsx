@@ -73,6 +73,7 @@ export default function CallPage() {
   const [outcome, setOutcome] = useState(OUTCOMES[0]);
   const [notes, setNotes] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [dialInput, setDialInput] = useState("");
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -113,6 +114,25 @@ export default function CallPage() {
   function stopTimer() {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+  }
+
+  // Dialpad: during a live call, keys send DTMF tones (phone menus);
+  // otherwise they build up a number to dial manually.
+  function padPress(key: string) {
+    if (status === "live") {
+      callRef.current?.sendDigits(key);
+    } else if (status === "idle") {
+      setDialInput((prev) => (prev + key).slice(0, 18));
+    }
+  }
+
+  function manualCall() {
+    const number = normalize(dialInput);
+    if (!number) {
+      setError("Enter a valid number to dial, e.g. 201-555-1234");
+      return;
+    }
+    callLead({ id: `manual-${Date.now()}`, name: number, number, done: false });
   }
 
   async function callLead(lead: Lead) {
@@ -274,6 +294,32 @@ export default function CallPage() {
                     <button className="btn-ghost" onClick={toggleMute}>{muted ? "Unmute" : "Mute"}</button>
                     <button className="btn-red" onClick={hangup}>Hang up</button>
                   </div>
+                </>
+              )}
+
+              {/* Dialpad: manual dial when idle, DTMF keypad when live */}
+              {status === "idle" && (
+                <input
+                  className="dial-display"
+                  value={dialInput}
+                  onChange={(e) => setDialInput(e.target.value)}
+                  placeholder="Type or tap a number"
+                />
+              )}
+              {(status === "idle" || status === "live") && (
+                <>
+                  <div className="dialpad">
+                    {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((k) => (
+                      <button key={k} className="pad-key" onClick={() => padPress(k)}>{k}</button>
+                    ))}
+                  </div>
+                  {status === "idle" && (
+                    <div className="controls" style={{ marginTop: 12 }}>
+                      <button className="btn-ghost" onClick={() => setDialInput((p) => p.slice(0, -1))} disabled={!dialInput}>⌫</button>
+                      <button className="btn-green" onClick={manualCall} disabled={!ready || !dialInput}>Call this number</button>
+                    </div>
+                  )}
+                  {status === "live" && <div className="hint">Tap keys to send tones (e.g. phone menus)</div>}
                 </>
               )}
             </div>
