@@ -7,9 +7,12 @@ import "./call.css";
 
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/xqerkekp";
 
+// Ordered by value, best first. "Sending denials" is the only one that matters —
+// it is a live engagement, not a maybe. Everything else is a step toward it.
 const OUTCOMES = [
-  "Interested",
-  "Call back later",
+  "Sending denials",
+  "Interested — call back",
+  "Gatekeeper — no decision-maker",
   "Not interested",
   "No answer",
   "Voicemail",
@@ -76,6 +79,9 @@ export default function CallPage() {
   const [notes, setNotes] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const [dialInput, setDialInput] = useState("");
+  // Off by default: several target states require all-party consent to record, and a
+  // cold call is exactly where that bites. Turn it on deliberately, per session.
+  const [record, setRecord] = useState(false);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -155,7 +161,9 @@ export default function CallPage() {
       return;
     }
     try {
-      const call = await device.connect({ params: { To: lead.number } });
+      const call = await device.connect({
+        params: { To: lead.number, Record: record ? "1" : "0" },
+      });
       callRef.current = call;
       call.on("accept", () => {
         setStatus("live");
@@ -293,7 +301,12 @@ export default function CallPage() {
   return (
     <div className="cp">
       <h1>Rocky Solutions — Call Console</h1>
-      <div className="sub">Cold-call NJ HVAC businesses from +1 201-347-7569. Calls are recorded; the callee hears a recording notice.</div>
+      <div className="sub">
+        Equipment dealers, from +1 201-347-7569. Ask for denied warranty claims, not for a meeting.
+        {record
+          ? " Recording is ON — the callee hears a notice first."
+          : " Recording is OFF."}
+      </div>
 
       {error && <div className="banner">{error}</div>}
 
@@ -315,6 +328,15 @@ export default function CallPage() {
             {!ready && <button className="btn-blue" onClick={() => connectDevice()}>Connect phone</button>}
             {ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
           </div>
+          <label className="hint" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+            <input
+              type="checkbox"
+              checked={record}
+              disabled={status !== "idle"}
+              onChange={(e) => setRecord(e.target.checked)}
+            />
+            Record calls — off by default; some states need all-party consent
+          </label>
           {leads.map((l) => (
             <div key={l.id} className={`lead ${l.id === activeId ? "active" : ""} ${l.done ? "done" : ""}`}>
               <div>
