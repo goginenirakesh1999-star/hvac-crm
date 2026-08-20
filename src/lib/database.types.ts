@@ -6,6 +6,7 @@ export type JobStatus = "pending" | "booked" | "completed" | "paid";
 export type LeadSource = "facebook" | "typebot" | "manual";
 export type LeadStatus = "new" | "contacted" | "converted" | "dead";
 export type TenantRole = "owner" | "member";
+export type AgentRole = "admin" | "agent";
 
 export interface Database {
   public: {
@@ -122,11 +123,71 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["settings"]["Insert"]>;
         Relationships: [];
       };
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          role: AgentRole;
+          twilio_number: string | null;
+          twilio_number_sid: string | null;
+          daily_call_target: number;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          role?: AgentRole;
+          twilio_number?: string | null;
+          twilio_number_sid?: string | null;
+          daily_call_target?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
+      };
+      call_logs: {
+        Row: {
+          id: string;
+          agent_id: string;
+          dealership_name: string | null;
+          dealership_phone: string;
+          direction: string;
+          twilio_call_sid: string | null;
+          status: string | null;
+          duration_seconds: number;
+          outcome: string | null;
+          notes: string | null;
+          recording_sid: string | null;
+          is_conversion: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          agent_id: string;
+          dealership_name?: string | null;
+          dealership_phone: string;
+          direction?: string;
+          twilio_call_sid?: string | null;
+          status?: string | null;
+          duration_seconds?: number;
+          outcome?: string | null;
+          notes?: string | null;
+          recording_sid?: string | null;
+          is_conversion?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["call_logs"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       is_tenant_member: {
         Args: { t_id: string };
+        Returns: boolean;
+      };
+      is_admin: {
+        Args: Record<string, never>;
         Returns: boolean;
       };
     };
@@ -135,6 +196,7 @@ export interface Database {
       lead_source: LeadSource;
       lead_status: LeadStatus;
       tenant_role: TenantRole;
+      agent_role: AgentRole;
     };
     CompositeTypes: Record<string, never>;
   };

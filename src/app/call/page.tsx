@@ -79,9 +79,10 @@ export default function CallPage() {
   const [notes, setNotes] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const [dialInput, setDialInput] = useState("");
-  // Off by default: several target states require all-party consent to record, and a
-  // cold call is exactly where that bites. Turn it on deliberately, per session.
-  const [record, setRecord] = useState(false);
+  // On by default for the team: calls are recorded for QA and conversion review.
+  // The callee hears a "may be recorded" notice before being bridged in (the
+  // standard all-party-consent mitigation). Uncheck to turn off per session.
+  const [record, setRecord] = useState(true);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -186,14 +187,16 @@ export default function CallPage() {
     stopTimer();
     const dur = status === "live" ? Math.floor((Date.now() - startedAtRef.current) / 1000) : 0;
     const callSid = (callRef.current?.parameters?.CallSid as string) || "";
+    const finalOutcome = outcome;
+    const finalNotes = notes;
     setLog((prev) => [
       {
         name: lead.name,
         number: lead.number,
         at: new Date().toLocaleString(),
         durationSec: dur,
-        outcome,
-        notes,
+        outcome: finalOutcome,
+        notes: finalNotes,
         callSid,
       },
       ...prev,
@@ -203,6 +206,23 @@ export default function CallPage() {
     setStatus("idle");
     setActiveId(null);
     setSeconds(0);
+
+    // Persist to the database, attributed to the signed-in agent (server-side).
+    // Fire-and-forget: a logging hiccup must never block the next call.
+    fetch("/api/calls/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dealership_name: lead.name,
+        dealership_phone: lead.number,
+        twilio_call_sid: callSid,
+        status: dur > 0 ? "completed" : "no-answer",
+        duration_seconds: dur,
+        outcome: finalOutcome,
+        notes: finalNotes,
+        is_conversion: finalOutcome === "Sending denials",
+      }),
+    }).catch(() => {});
   }
 
   function hangup() {
@@ -300,12 +320,19 @@ export default function CallPage() {
 
   return (
     <div className="cp">
-      <h1>Rocky Solutions — Call Console</h1>
-      <div className="sub">
-        Equipment dealers, from +1 201-347-7569. Ask for denied warranty claims, not for a meeting.
-        {record
-          ? " Recording is ON — the callee hears a notice first."
-          : " Recording is OFF."}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+        <div>
+          <h1>Rocky Solutions — Call Console</h1>
+          <div className="sub">
+            Equipment dealers, from your assigned number. Ask for denied warranty claims, not for a meeting.
+            {record
+              ? " Recording is ON — the callee hears a notice first."
+              : " Recording is OFF."}
+          </div>
+        </div>
+        <form action="/api/auth/signout" method="post">
+          <button className="btn-ghost" type="submit">Sign out</button>
+        </form>
       </div>
 
       {error && <div className="banner">{error}</div>}
@@ -335,7 +362,7 @@ export default function CallPage() {
               disabled={status !== "idle"}
               onChange={(e) => setRecord(e.target.checked)}
             />
-            Record calls — off by default; some states need all-party consent
+            Record calls — on by default (callee hears a notice); uncheck to turn off
           </label>
           {leads.map((l) => (
             <div key={l.id} className={`lead ${l.id === activeId ? "active" : ""} ${l.done ? "done" : ""}`}>
