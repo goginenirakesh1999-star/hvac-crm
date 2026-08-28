@@ -42,6 +42,9 @@
 
 /* Top bar */
 .cp .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.cp .brand { display: flex; align-items: center; gap: 12px; }
+.cp .logo-mark { height: 40px; width: auto; flex: none; }
+.cp .login-logo { display: block; width: 210px; max-width: 72%; height: auto; margin: 6px auto 14px; }
 .cp .topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cp .segmented { display: inline-flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
 .cp .seg { padding: 6px 12px; border-radius: 7px; font-size: 0.82rem; color: var(--muted); text-decoration: none; }

@@ -198,11 +198,15 @@ export default async function AdminPage({
   return (
     <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/midnight2.jpg)" } as React.CSSProperties}>
       <div className="topbar">
-        <div>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="logo-mark" src="/logo-mark.png" alt="Rocky Solutions LLC" />
+          <div>
           <h1>Team Dashboard</h1>
           <div className="sub">
             {RANGES[rangeKey].label} · conversion = &quot;Sending denials&quot;
           </div>
+        </div>
         </div>
         <div className="topbar-actions">
           <div className="segmented">

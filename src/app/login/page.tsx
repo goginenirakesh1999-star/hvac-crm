@@ -36,8 +36,9 @@ export default function LoginPage() {
   return (
     <div className="cp hero" style={{ display: "grid", placeItems: "center", ["--wall" as string]: "url(/wallpapers/aurora1.jpg)" } as React.CSSProperties}>
       <div className="panel" style={{ width: "100%", maxWidth: 400 }}>
-        <h1 style={{ fontSize: "1.35rem", marginBottom: 4 }}>Rocky Solutions</h1>
-        <div className="sub" style={{ marginBottom: 8 }}>Sign in to the call console.</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="login-logo" src="/logo-lockup.png" alt="Rocky Solutions LLC" width={400} height={310} />
+        <div className="sub" style={{ marginBottom: 8, textAlign: "center" }}>Sign in to the call console.</div>
         <Quote hero />
         <form onSubmit={onSubmit}>
           <label>Username</label>

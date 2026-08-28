@@ -128,9 +128,13 @@ export default function AppointmentsPage() {
   return (
     <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/focus3.jpg)" } as React.CSSProperties}>
       <div className="topbar">
-        <div>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="logo-mark" src="/logo-mark.png" alt="Rocky Solutions LLC" />
+          <div>
           <h1>Closer — Appointments</h1>
           <div className="sub">Booked by the callers. Call at the slot and mark the result.</div>
+        </div>
         </div>
         <div className="topbar-actions">
           <button className="btn-ghost" onClick={load}>Refresh</button>

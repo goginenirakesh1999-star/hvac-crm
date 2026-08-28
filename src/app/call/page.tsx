@@ -239,11 +239,15 @@ export default function CallPage() {
   return (
     <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/drive4.jpg)" } as React.CSSProperties}>
       <div className="topbar">
-        <div>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="logo-mark" src="/logo-mark.png" alt="Rocky Solutions LLC" />
+          <div>
           <h1>Call Console</h1>
           <div className="sub">
             Your assigned leads. {dueCount > 0 && <strong className="conv">{dueCount} follow-up{dueCount > 1 ? "s" : ""} due now.</strong>} Recording is {record ? "ON" : "OFF"}.
           </div>
+        </div>
         </div>
         <div className="topbar-actions">
           <button className="btn-ghost" onClick={loadLeads}>Refresh</button>
