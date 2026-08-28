@@ -470,6 +470,7 @@ export default function CallPage() {
                   <div className="timer">{mm}:{ss}</div>
                   <div className="controls">
                     <button className="btn-ghost" onClick={dialer.toggleMute}>{dialer.muted ? "Unmute" : "Mute"}</button>
+                    <button className="btn-blue" onClick={() => document.getElementById("book-panel")?.scrollIntoView({ behavior: "smooth", block: "center" })}>📅 Book</button>
                     <button className="btn-red" onClick={dialer.hangup}>Hang up</button>
                   </div>
                 </>
@@ -514,8 +515,8 @@ export default function CallPage() {
           )}
 
           {(active || status === "idle") && (
-            <div className="panel">
-              <h2>📅 Book appointment{active ? ` · ${displayName(active)}` : ""}</h2>
+            <div className="panel" id="book-panel">
+              <h2>📅 Book appointment{active ? ` · ${displayName(active)}` : ""}{status !== "idle" && <span className="hint" style={{ marginLeft: 8 }}>— you’re on the call</span>}</h2>
               {!active ? (
                 <div className="muted">Select a lead on the left to capture their details and schedule.</div>
               ) : (
