@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { LeadStatus } from "@/lib/database.types";
 
 interface NewLead {
@@ -14,6 +13,8 @@ interface CreateBody {
 }
 
 // GET: admins get every lead (optionally filtered); callers get their own queue.
+// Everything runs on the caller's own session — RLS scopes the rows, and an admin
+// can read all profiles/leads — so no service-role key is required.
 export async function GET(req: Request) {
   const supabase = await createServerSupabase();
   const {
@@ -39,12 +40,12 @@ export async function GET(req: Request) {
   const { data: leads, error } = await q;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  // resolve caller names for the admin tracker (service role: profile RLS is per-user)
+  // resolve caller names for the admin tracker (admins can read all profiles via RLS)
   let owners: Record<string, string> = {};
   if (isAdmin) {
     const ids = [...new Set((leads ?? []).map((l) => l.assigned_to).filter(Boolean))] as string[];
     if (ids.length) {
-      const { data: profs } = await createAdminClient().from("profiles").select("id, full_name").in("id", ids);
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
       owners = Object.fromEntries((profs ?? []).map((p) => [p.id, p.full_name ?? p.id.slice(0, 8)]));
     }
   }
@@ -54,6 +55,7 @@ export async function GET(req: Request) {
 }
 
 // POST: admin bulk-creates leads and assigns them (to one caller or split evenly).
+// Runs on the admin's session: RLS lets an admin read callers and insert leads.
 export async function POST(req: Request) {
   const supabase = await createServerSupabase();
   const {
@@ -76,21 +78,21 @@ export async function POST(req: Request) {
   // resolve assignment targets
   let targets: (string | null)[] = [null];
   if (body.assignTo === "split") {
-    const { data: callers } = await createAdminClient().from("profiles").select("id").eq("role", "caller");
+    const { data: callers, error: ce } = await supabase.from("profiles").select("id").eq("role", "caller");
+    if (ce) return NextResponse.json({ ok: false, error: ce.message }, { status: 500 });
     targets = (callers ?? []).map((c) => c.id);
     if (!targets.length) targets = [null];
   } else if (body.assignTo) {
     targets = [body.assignTo];
   }
 
-  const admin = createAdminClient();
   const rows = clean.map((l, i) => ({
     assigned_to: targets[i % targets.length],
     name: l.name ?? null,
     business: l.business ?? null,
     phone: l.phone!.trim(),
   }));
-  const { error, count } = await admin.from("leads").insert(rows, { count: "exact" });
+  const { error, count } = await supabase.from("leads").insert(rows, { count: "exact" });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, inserted: count ?? rows.length });
