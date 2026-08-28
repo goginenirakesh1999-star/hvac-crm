@@ -64,7 +64,8 @@ export async function POST(req: Request) {
   if (!user) return new NextResponse("unauthorized", { status: 401 });
 
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (me?.role !== "admin") return new NextResponse("forbidden", { status: 403 });
+  if (!me) return new NextResponse("forbidden", { status: 403 });
+  const isAdmin = me.role === "admin";
 
   let body: CreateBody;
   try {
@@ -75,15 +76,19 @@ export async function POST(req: Request) {
   const clean = (body.leads ?? []).filter((l) => l.phone && l.phone.replace(/\D/g, "").length >= 7);
   if (!clean.length) return NextResponse.json({ ok: false, error: "no valid leads (need phone numbers)" }, { status: 422 });
 
-  // resolve assignment targets
-  let targets: (string | null)[] = [null];
-  if (body.assignTo === "split") {
-    const { data: callers, error: ce } = await supabase.from("profiles").select("id").eq("role", "caller");
-    if (ce) return NextResponse.json({ ok: false, error: ce.message }, { status: 500 });
-    targets = (callers ?? []).map((c) => c.id);
-    if (!targets.length) targets = [null];
-  } else if (body.assignTo) {
-    targets = [body.assignTo];
+  // resolve assignment targets. Non-admins may only add leads to their own queue.
+  let targets: (string | null)[] = [user.id];
+  if (isAdmin) {
+    if (body.assignTo === "split") {
+      const { data: callers, error: ce } = await supabase.from("profiles").select("id").eq("role", "caller");
+      if (ce) return NextResponse.json({ ok: false, error: ce.message }, { status: 500 });
+      targets = (callers ?? []).map((c) => c.id);
+      if (!targets.length) targets = [null];
+    } else if (body.assignTo) {
+      targets = [body.assignTo];
+    } else {
+      targets = [null];
+    }
   }
 
   const rows = clean.map((l, i) => ({
