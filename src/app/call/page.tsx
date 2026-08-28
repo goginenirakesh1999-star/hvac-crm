@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { LeadStatus } from "@/lib/database.types";
 import Quote from "../Quote";
 import SideNav from "../SideNav";
+import BookCall from "../BookCall";
 import "./call.css";
 
 interface Lead {
@@ -327,6 +328,7 @@ export default function CallPage() {
         </div>
         <div className="topbar-actions">
           <button className="btn-ghost" onClick={() => { loadLeads(); loadStats(); }}>Refresh</button>
+          <BookCall label="📆 Schedule call" className="btn-ghost" />
           {!dialer.ready && <button className="btn-blue" onClick={() => dialer.connectDevice()}>Connect phone</button>}
           {dialer.ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
         </div>
@@ -478,8 +480,14 @@ export default function CallPage() {
                   </div>
                   <div className="actions" style={{ alignItems: "center" }}>
                     <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
+                    <BookCall
+                      mirror
+                      ctx={{ leadId: active.id, name: active.name, business: active.business, phone: active.phone, notes: `${active.business ?? ""} ${active.phone}`.trim() }}
+                      label="📆 Schedule client meeting (Cal)"
+                    />
                     {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
                   </div>
+                  <div className="hint">“Schedule client meeting” opens the calendar — enter the client’s email so their confirmation is sent to them. It also shows here and on the closer/admin views.</div>
                 </>
               )}
             </div>

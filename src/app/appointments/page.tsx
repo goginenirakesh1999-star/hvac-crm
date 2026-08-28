@@ -5,6 +5,7 @@ import { useDialer } from "@/lib/useDialer";
 import { createClient } from "@/lib/supabase/client";
 import Quote from "../Quote";
 import SideNav from "../SideNav";
+import BookCall from "../BookCall";
 import "../call/call.css";
 
 interface Appt {
@@ -147,6 +148,7 @@ export default function AppointmentsPage() {
         </div>
         <div className="topbar-actions">
           <button className="btn-ghost" onClick={load}>Refresh</button>
+          <BookCall label="📆 Schedule meeting" className="btn-ghost" />
         </div>
       </div>
 
@@ -202,6 +204,7 @@ export default function AppointmentsPage() {
                     <button className="btn-blue" onClick={() => mark(a, "won")}>Won</button>
                     <button className="btn-ghost" onClick={() => mark(a, "lost")}>Lost</button>
                     <button className="btn-ghost" onClick={() => mark(a, "no_show")}>No-show</button>
+                    <BookCall ctx={{ name: a.prospect_name, business: a.prospect_business, phone: a.prospect_phone }} label="📆 Invite" className="btn-ghost" />
                   </div>
                 </div>
               </div>

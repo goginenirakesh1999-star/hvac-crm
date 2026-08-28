@@ -3,6 +3,7 @@ import type { AgentRole } from "@/lib/database.types";
 import LeadManager from "./LeadManager";
 import Quote from "../Quote";
 import SideNav from "../SideNav";
+import BookCall from "../BookCall";
 import "../call/call.css";
 
 export const dynamic = "force-dynamic";
@@ -217,6 +218,7 @@ export default async function AdminPage({
               </a>
             ))}
           </div>
+          <BookCall label="📆 Schedule meeting" className="btn-ghost" />
         </div>
       </div>
 
