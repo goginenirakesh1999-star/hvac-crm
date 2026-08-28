@@ -95,6 +95,11 @@ export default function CallPage() {
   const [callsToday, setCallsToday] = useState(0);
   const [target, setTarget] = useState(40);
 
+  // per-lead call history + live-due nudge
+  const [history, setHistory] = useState<{ id: string; created_at: string; outcome: string | null; duration_seconds: number; notes: string | null; twilio_call_sid: string | null }[]>([]);
+  const [, setTick] = useState(0);
+  const prevDueRef = useRef(0);
+
   const activeRef = useRef<Lead | null>(null);
   const lastManualRef = useRef("");
 
@@ -147,6 +152,9 @@ export default function CallPage() {
   useEffect(() => {
     loadLeads();
     loadStats();
+    if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission();
+    const t = setInterval(() => setTick((n) => n + 1), 30000); // refresh "due" state
+    return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -158,6 +166,15 @@ export default function CallPage() {
     setActiveId(l.id); activeRef.current = l;
     setLastCall(null); setDispo(DISPOSITIONS[0].label); setDispoNotes("");
     setCallbackWhen(""); setBk({ when: "", notes: "" }); setMsg(""); setBkMsg("");
+    fetchHistory(l.id);
+  }
+  async function fetchHistory(id: string) {
+    setHistory([]);
+    try {
+      const r = await fetch(`/api/leads/${id}/calls`);
+      const b = await r.json();
+      if (b.ok) setHistory(b.calls);
+    } catch { /* ignore */ }
   }
   function callLead(l: Lead) {
     if (status !== "idle") return;
@@ -264,6 +281,14 @@ export default function CallPage() {
   const fresh = leads.filter((l) => l.status === "new");
   const working = leads.filter((l) => l.status === "attempted" || l.status === "contacted");
   const dueCount = followups.filter((l) => l.callback_at && new Date(l.callback_at).getTime() <= now).length;
+  const nextDue = followups.find((l) => l.callback_at && new Date(l.callback_at).getTime() <= now) ?? null;
+  // Notify when new follow-ups become due (desktop notification if permitted).
+  useEffect(() => {
+    if (dueCount > prevDueRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification("Follow-up due", { body: `${dueCount} follow-up${dueCount > 1 ? "s" : ""} due now` });
+    }
+    prevDueRef.current = dueCount;
+  }, [dueCount]);
   const bookedCount = leads.filter((l) => l.status === "appointment").length;
   const wonCount = leads.filter((l) => l.status === "won").length;
 
@@ -307,6 +332,13 @@ export default function CallPage() {
 
       <Quote />
       {dialer.error && <div className="banner">{dialer.error}</div>}
+
+      {dueCount > 0 && (
+        <div className="nudge">
+          <span>🔔 <strong>{dueCount}</strong> follow-up{dueCount > 1 ? "s" : ""} due{nextDue && <> — next: <strong>{displayName(nextDue)}</strong></>}</span>
+          {nextDue && status === "idle" && <button className="btn-green sm" onClick={() => callLead(nextDue)}>Call next</button>}
+        </div>
+      )}
 
       {/* Scoreboard */}
       <div className="stats">
@@ -442,6 +474,23 @@ export default function CallPage() {
                 <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
                 {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
               </div>
+            </div>
+          )}
+
+          {active && status === "idle" && (
+            <div className="panel">
+              <h2>Call history · {displayName(active)}</h2>
+              {!history.length && <div className="muted">No prior calls logged for this lead.</div>}
+              {history.map((h) => (
+                <div key={h.id} className="hist">
+                  <div>
+                    <div className="nm">{h.outcome || "—"} <span className="ph">· {h.duration_seconds}s</span></div>
+                    <div className="ph">{new Date(h.created_at).toLocaleString()}</div>
+                    {h.notes && <div className="appt-notes">{h.notes}</div>}
+                  </div>
+                  {h.twilio_call_sid && <a href={`/api/voice/recording-media?callSid=${h.twilio_call_sid}`} target="_blank" rel="noreferrer">▶ Play</a>}
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -66,6 +66,7 @@ export default function LeadManager({ callers }: { callers: Caller[] }) {
   const [msg, setMsg] = useState("");
   const [fStatus, setFStatus] = useState<string>("");
   const [fCaller, setFCaller] = useState<string>("");
+  const [saving, setSaving] = useState<Record<string, "saving" | "saved" | "error">>({});
 
   async function load() {
     try {
@@ -117,6 +118,27 @@ export default function LeadManager({ callers }: { callers: Caller[] }) {
       load();
     } else {
       setMsg(body.error || "Upload failed.");
+    }
+  }
+
+  // Optimistically patch a lead field; revert on failure.
+  async function patchLead(id: string, patch: Partial<Lead>, body: Record<string, unknown>) {
+    const prev = leads.find((l) => l.id === id);
+    if (!prev) return;
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setSaving((s) => ({ ...s, [id]: "saving" }));
+    try {
+      const res = await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      setSaving((s) => ({ ...s, [id]: "saved" }));
+      setTimeout(() => setSaving((s) => { const n = { ...s }; delete n[id]; return n; }), 1500);
+    } catch {
+      setLeads((ls) => ls.map((l) => (l.id === id ? prev : l)));
+      setSaving((s) => ({ ...s, [id]: "error" }));
     }
   }
 
@@ -187,13 +209,38 @@ export default function LeadManager({ callers }: { callers: Caller[] }) {
             </thead>
             <tbody>
               {filtered.slice(0, 400).map((l) => {
-                const meta = STAGES.find((s) => s.key === l.status)!;
+                const st = saving[l.id];
                 return (
                   <tr key={l.id}>
                     <td>{l.business || l.name || "—"}{l.name && l.business && <><br /><span className="ph">{l.name}</span></>}</td>
                     <td>{l.phone}</td>
-                    <td>{l.owner || "—"}</td>
-                    <td><span className={`badge ${meta.cls}`}>{meta.label}</span></td>
+                    <td>
+                      <select
+                        value={l.assigned_to ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          patchLead(
+                            l.id,
+                            { assigned_to: v || null, owner: callers.find((c) => c.id === v)?.name ?? "" },
+                            { assigned_to: v || null }
+                          );
+                        }}
+                        style={{ width: "auto" }}
+                      >
+                        <option value="">Unassigned</option>
+                        {callers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        value={l.status}
+                        onChange={(e) => patchLead(l.id, { status: e.target.value as LeadStatus }, { status: e.target.value })}
+                        style={{ width: "auto" }}
+                      >
+                        {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      </select>
+                      {st && <span className="hint" style={{ marginLeft: 6 }}>{st === "saving" ? "…" : st === "saved" ? "✓ saved" : "✕ error"}</span>}
+                    </td>
                     <td>{l.attempts}</td>
                     <td className="nowrap">{fmt(l.last_contacted_at)}</td>
                     <td className="nowrap">{fmt(l.callback_at)}</td>

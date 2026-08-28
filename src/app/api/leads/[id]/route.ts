@@ -14,6 +14,7 @@ interface Body {
   callback_at?: string | null;
   attempts?: number;
   last_contacted_at?: string;
+  assigned_to?: string | null;
 }
 
 // PATCH: a caller updates their lead after a call (disposition, notes, callback),
@@ -42,6 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.callback_at !== undefined) patch.callback_at = body.callback_at;
   if (body.attempts !== undefined) patch.attempts = body.attempts;
   if (body.last_contacted_at !== undefined) patch.last_contacted_at = body.last_contacted_at;
+  if (body.assigned_to !== undefined) patch.assigned_to = body.assigned_to;
 
   const { error } = await supabase.from("leads").update(patch).eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
