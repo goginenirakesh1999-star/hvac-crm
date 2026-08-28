@@ -37,6 +37,30 @@
   background-image: linear-gradient(180deg, rgba(9,16,26,0.70), rgba(9,16,26,0.90)),
     var(--wall, none);
 }
+
+/* Left sidebar nav (team-wide) */
+.sidenav { position: fixed; left: 0; top: 0; bottom: 0; width: 216px; background: #0a1420; border-right: 1px solid #263a57; padding: 18px 14px; display: flex; flex-direction: column; gap: 18px; z-index: 20; font-family: "Segoe UI", system-ui, sans-serif; }
+.sidenav .sn-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #e8eef7; }
+.sidenav .sn-brand img { height: 34px; width: auto; }
+.sidenav .sn-links { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.sidenav .sn-link { padding: 10px 12px; border-radius: 9px; color: #9fb1c7; text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: background 0.15s, color 0.15s; }
+.sidenav .sn-link:hover { background: rgba(47,127,240,0.12); color: #e8eef7; }
+.sidenav .sn-link.on { background: #2f7ff0; color: #fff; }
+.sidenav .sn-foot { border-top: 1px solid #263a57; padding-top: 12px; }
+.sidenav .sn-user { font-size: 0.85rem; margin-bottom: 8px; color: #e8eef7; text-transform: capitalize; }
+.sidenav .sn-role { display: block; color: #9fb1c7; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.sidenav .btn-ghost { background: transparent; border: 1px solid #263a57; color: #e8eef7; border-radius: 8px; font-weight: 600; font-size: 0.85rem; padding: 8px 12px; cursor: pointer; }
+.sidenav .btn-ghost:hover { background: rgba(255,255,255,0.05); }
+
+@media (min-width: 900px) { .cp.with-nav { margin-left: 216px; } }
+@media (max-width: 899px) {
+  .sidenav { position: static; width: auto; flex-direction: row; align-items: center; height: auto; bottom: auto; gap: 12px; padding: 10px 14px; overflow-x: auto; }
+  .sidenav .sn-links { flex-direction: row; flex: 1; }
+  .sidenav .sn-brand span { display: none; }
+  .sidenav .sn-foot { border-top: none; padding-top: 0; }
+  .sidenav .sn-user { display: none; }
+  .cp.with-nav { margin-left: 0; }
+}
 .cp h1 { font-size: 1.45rem; margin-bottom: 2px; font-weight: 700; }
 .cp .sub { color: var(--muted); font-size: 0.9rem; }
 

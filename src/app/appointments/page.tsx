@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDialer } from "@/lib/useDialer";
 import { createClient } from "@/lib/supabase/client";
 import Quote from "../Quote";
+import SideNav from "../SideNav";
 import "../call/call.css";
 
 interface Appt {
@@ -132,7 +133,9 @@ export default function AppointmentsPage() {
   const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
-    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/focus3.jpg)" } as React.CSSProperties}>
+    <>
+    <SideNav />
+    <div className="cp with-nav" style={{ ["--wall" as string]: "url(/wallpapers/focus3.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -144,7 +147,6 @@ export default function AppointmentsPage() {
         </div>
         <div className="topbar-actions">
           <button className="btn-ghost" onClick={load}>Refresh</button>
-          <form action="/api/auth/signout" method="post"><button className="btn-ghost" type="submit">Sign out</button></form>
         </div>
       </div>
 
@@ -231,5 +233,6 @@ export default function AppointmentsPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

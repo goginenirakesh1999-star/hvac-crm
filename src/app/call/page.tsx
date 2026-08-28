@@ -5,6 +5,7 @@ import { useDialer } from "@/lib/useDialer";
 import { createClient } from "@/lib/supabase/client";
 import type { LeadStatus } from "@/lib/database.types";
 import Quote from "../Quote";
+import SideNav from "../SideNav";
 import "./call.css";
 
 interface Lead {
@@ -310,7 +311,9 @@ export default function CallPage() {
   ];
 
   return (
-    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/drive4.jpg)" } as React.CSSProperties}>
+    <>
+    <SideNav />
+    <div className="cp with-nav" style={{ ["--wall" as string]: "url(/wallpapers/drive4.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -326,7 +329,6 @@ export default function CallPage() {
           <button className="btn-ghost" onClick={() => { loadLeads(); loadStats(); }}>Refresh</button>
           {!dialer.ready && <button className="btn-blue" onClick={() => dialer.connectDevice()}>Connect phone</button>}
           {dialer.ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
-          <form action="/api/auth/signout" method="post"><button className="btn-ghost" type="submit">Sign out</button></form>
         </div>
       </div>
 
@@ -463,17 +465,23 @@ export default function CallPage() {
             </div>
           )}
 
-          {active && status === "idle" && (
+          {status === "idle" && (
             <div className="panel">
-              <h2>Book appointment · {displayName(active)}</h2>
-              <div className="row2">
-                <div><label>Date &amp; time</label><input type="datetime-local" value={bk.when} onChange={(e) => setBk({ ...bk, when: e.target.value })} /></div>
-                <div><label>Notes for the closer</label><input value={bk.notes} onChange={(e) => setBk({ ...bk, notes: e.target.value })} placeholder="Context…" /></div>
-              </div>
-              <div className="actions" style={{ alignItems: "center" }}>
-                <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
-                {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
-              </div>
+              <h2>📅 Book appointment{active ? ` · ${displayName(active)}` : ""}</h2>
+              {!active ? (
+                <div className="muted">Select a lead on the left, then schedule a time to hand it to the closer.</div>
+              ) : (
+                <>
+                  <div className="row2">
+                    <div><label>Date &amp; time</label><input type="datetime-local" value={bk.when} onChange={(e) => setBk({ ...bk, when: e.target.value })} /></div>
+                    <div><label>Notes for the closer</label><input value={bk.notes} onChange={(e) => setBk({ ...bk, notes: e.target.value })} placeholder="Context…" /></div>
+                  </div>
+                  <div className="actions" style={{ alignItems: "center" }}>
+                    <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
+                    {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -496,5 +504,6 @@ export default function CallPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

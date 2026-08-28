@@ -2,6 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import type { AgentRole } from "@/lib/database.types";
 import LeadManager from "./LeadManager";
 import Quote from "../Quote";
+import SideNav from "../SideNav";
 import "../call/call.css";
 
 export const dynamic = "force-dynamic";
@@ -111,15 +112,13 @@ export default async function AdminPage({
 
   if (me?.role !== "admin") {
     return (
-      <div className="cp">
-        <div className="topbar">
-          <h1>Dashboard</h1>
-          <form action="/api/auth/signout" method="post">
-            <button className="btn-ghost" type="submit">Sign out</button>
-          </form>
-        </div>
+      <>
+      <SideNav />
+      <div className="cp with-nav">
+        <div className="topbar"><h1>Dashboard</h1></div>
         <div className="banner">This page is for managers only.</div>
       </div>
+      </>
     );
   }
 
@@ -196,7 +195,9 @@ export default async function AdminPage({
   const showTarget = rangeKey === "today";
 
   return (
-    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/midnight2.jpg)" } as React.CSSProperties}>
+    <>
+    <SideNav />
+    <div className="cp with-nav" style={{ ["--wall" as string]: "url(/wallpapers/midnight2.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -216,10 +217,6 @@ export default async function AdminPage({
               </a>
             ))}
           </div>
-          <a className="btn-ghost" href="/call">Console</a>
-          <form action="/api/auth/signout" method="post">
-            <button className="btn-ghost" type="submit">Sign out</button>
-          </form>
         </div>
       </div>
 
@@ -298,5 +295,6 @@ export default async function AdminPage({
         <div className="hint">Recordings take a few seconds to process after hang-up before playback works.</div>
       </div>
     </div>
+    </>
   );
 }
