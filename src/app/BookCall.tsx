@@ -9,6 +9,7 @@ const LINK = "rakesh-gogineni-udonap/quick-intro-of-the-services";
 interface Ctx {
   leadId?: string;
   name?: string | null;
+  email?: string | null;
   business?: string | null;
   phone?: string;
   notes?: string;
@@ -42,6 +43,7 @@ async function ensureCal() {
           prospect_name: ctx.name ?? null,
           prospect_business: ctx.business ?? null,
           prospect_phone: ctx.phone,
+          prospect_email: ctx.email ?? null,
           scheduled_at: start ? new Date(start).toISOString() : new Date().toISOString(),
           notes: `Booked via Cal.com${ctx.notes ? " · " + ctx.notes : ""}`,
           lead_id: ctx.leadId ?? null,
@@ -74,6 +76,7 @@ export default function BookCall({
 
   const config: Record<string, string> = { layout: "month_view", useSlotsViewOnSmallScreen: "true" };
   if (ctx?.name) config.name = ctx.name;
+  if (ctx?.email) config.email = ctx.email;
   if (ctx?.notes) config.notes = ctx.notes;
 
   return (

@@ -74,6 +74,7 @@ export interface Database {
           prospect_name: string | null;
           prospect_business: string | null;
           prospect_phone: string;
+          prospect_email: string | null;
           scheduled_at: string;
           notes: string | null;
           status: string;
@@ -89,6 +90,7 @@ export interface Database {
           prospect_name?: string | null;
           prospect_business?: string | null;
           prospect_phone: string;
+          prospect_email?: string | null;
           scheduled_at: string;
           notes?: string | null;
           status?: string;
@@ -107,6 +109,7 @@ export interface Database {
           assigned_to: string | null;
           name: string | null;
           business: string | null;
+          email: string | null;
           phone: string;
           status: LeadStatus;
           attempts: number;
@@ -122,6 +125,7 @@ export interface Database {
           assigned_to?: string | null;
           name?: string | null;
           business?: string | null;
+          email?: string | null;
           phone: string;
           status?: LeadStatus;
           attempts?: number;

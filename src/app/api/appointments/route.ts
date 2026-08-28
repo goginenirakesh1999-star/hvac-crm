@@ -6,6 +6,7 @@ interface CreateBody {
   prospect_name?: string;
   prospect_business?: string;
   prospect_phone?: string;
+  prospect_email?: string;
   scheduled_at?: string;
   notes?: string;
   lead_id?: string;
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
       prospect_name: body.prospect_name ?? null,
       prospect_business: body.prospect_business ?? null,
       prospect_phone: body.prospect_phone,
+      prospect_email: body.prospect_email ?? null,
       scheduled_at: new Date(body.scheduled_at).toISOString(),
       notes: body.notes ?? null,
       lead_id: body.lead_id ?? null,
@@ -68,7 +70,7 @@ export async function GET() {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   const { data: appts, error } = await supabase
     .from("appointments")
-    .select("id, created_by, prospect_name, prospect_business, prospect_phone, scheduled_at, notes, status, outcome_notes, twilio_call_sid")
+    .select("id, created_by, prospect_name, prospect_business, prospect_phone, prospect_email, scheduled_at, notes, status, outcome_notes, twilio_call_sid")
     .gte("scheduled_at", since)
     .order("scheduled_at", { ascending: true })
     .limit(300);

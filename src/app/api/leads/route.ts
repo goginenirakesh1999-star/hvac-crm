@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
   let q = supabase
     .from("leads")
-    .select("id, assigned_to, name, business, phone, status, attempts, last_contacted_at, callback_at, notes, updated_at")
+    .select("id, assigned_to, name, business, email, phone, status, attempts, last_contacted_at, callback_at, notes, updated_at")
     .order("updated_at", { ascending: false })
     .limit(1000);
   if (status) q = q.eq("status", status as LeadStatus);

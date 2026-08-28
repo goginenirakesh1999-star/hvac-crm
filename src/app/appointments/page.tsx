@@ -13,6 +13,7 @@ interface Appt {
   prospect_name: string | null;
   prospect_business: string | null;
   prospect_phone: string;
+  prospect_email: string | null;
   scheduled_at: string;
   notes: string | null;
   status: string;
@@ -196,7 +197,7 @@ export default function AppointmentsPage() {
                 </div>
                 <div className="appt-main">
                   <div className="nm">{a.prospect_name || "—"} {a.prospect_business && <span className="muted">· {a.prospect_business}</span>}</div>
-                  <div className="ph">{a.prospect_phone} · booked by {a.booked_by || "—"}</div>
+                  <div className="ph">{a.prospect_phone}{a.prospect_email ? ` · ${a.prospect_email}` : ""} · booked by {a.booked_by || "—"}</div>
                   {a.notes && <div className="appt-notes">{a.notes}</div>}
                   <input placeholder="Outcome notes…" value={note[a.id] ?? a.outcome_notes ?? ""} onChange={(e) => setNote({ ...note, [a.id]: e.target.value })} style={{ marginTop: 8 }} />
                   <div className="actions" style={{ margin: "10px 0 0" }}>
@@ -204,7 +205,7 @@ export default function AppointmentsPage() {
                     <button className="btn-blue" onClick={() => mark(a, "won")}>Won</button>
                     <button className="btn-ghost" onClick={() => mark(a, "lost")}>Lost</button>
                     <button className="btn-ghost" onClick={() => mark(a, "no_show")}>No-show</button>
-                    <BookCall ctx={{ name: a.prospect_name, business: a.prospect_business, phone: a.prospect_phone }} label="📆 Invite" className="btn-ghost" />
+                    <BookCall ctx={{ name: a.prospect_name, email: a.prospect_email, business: a.prospect_business, phone: a.prospect_phone }} label="📆 Invite" className="btn-ghost" />
                   </div>
                 </div>
               </div>

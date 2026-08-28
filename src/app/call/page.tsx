@@ -13,6 +13,7 @@ interface Lead {
   id: string;
   name: string | null;
   business: string | null;
+  email: string | null;
   phone: string;
   status: LeadStatus;
   attempts: number;
@@ -44,6 +45,14 @@ const DISPOSITIONS: { label: string; status: LeadStatus; callback?: boolean }[] 
 ];
 
 type Tab = "followup" | "new" | "working" | "all";
+
+const US_TZ: [string, string][] = [
+  ["America/New_York", "Eastern (ET)"],
+  ["America/Chicago", "Central (CT)"],
+  ["America/Denver", "Mountain (MT)"],
+  ["America/Phoenix", "Arizona (MST)"],
+  ["America/Los_Angeles", "Pacific (PT)"],
+];
 
 function normalize(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
@@ -85,7 +94,7 @@ export default function CallPage() {
   const [lastCall, setLastCall] = useState<{ durationSec: number; callSid: string } | null>(null);
   const [msg, setMsg] = useState("");
 
-  const [bk, setBk] = useState({ when: "", notes: "" });
+  const [bk, setBk] = useState({ name: "", email: "", phone: "", business: "", when: "", notes: "", tz: "America/New_York" });
   const [bkMsg, setBkMsg] = useState("");
 
   // add-leads panel
@@ -167,7 +176,9 @@ export default function CallPage() {
   function selectLead(l: Lead) {
     setActiveId(l.id); activeRef.current = l;
     setLastCall(null); setDispo(DISPOSITIONS[0].label); setDispoNotes("");
-    setCallbackWhen(""); setBk({ when: "", notes: "" }); setMsg(""); setBkMsg("");
+    setCallbackWhen("");
+    setBk({ name: l.name ?? "", email: l.email ?? "", phone: l.phone, business: l.business ?? "", when: "", notes: "", tz: "America/New_York" });
+    setMsg(""); setBkMsg("");
     fetchHistory(l.id);
   }
   async function fetchHistory(id: string) {
@@ -227,20 +238,52 @@ export default function CallPage() {
     if (!lead) return setBkMsg("Select a lead first.");
     if (!bk.when) return setBkMsg("Pick a date & time.");
     setBkMsg("Booking…");
+    const phone = normalize(bk.phone) || lead.phone;
     const res = await fetch("/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        prospect_name: lead.name, prospect_business: lead.business, prospect_phone: lead.phone,
+        prospect_name: bk.name || lead.name, prospect_business: bk.business || lead.business,
+        prospect_phone: phone, prospect_email: bk.email || null,
         scheduled_at: new Date(bk.when).toISOString(), notes: bk.notes, lead_id: lead.id,
       }),
     });
+    // Persist the captured email back onto the lead for future reference.
+    if (bk.email) fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: bk.email }),
+    }).catch(() => {});
     if (res.ok) {
       setBkMsg("Appointment booked ✓ — sent to the closer.");
-      setBk({ when: "", notes: "" }); setActiveId(null); activeRef.current = null; setLastCall(null); loadLeads();
+      setActiveId(null); activeRef.current = null; setLastCall(null); loadLeads();
     } else {
       const b = await res.json().catch(() => ({}));
       setBkMsg(b.error || "Could not book.");
+    }
+  }
+
+  // Book a real client meeting via Cal.com (server-side) — Cal emails the client
+  // the invite + Meet link and it lands on the owner's one calendar.
+  async function bookCal() {
+    const lead = activeRef.current;
+    if (!lead) return setBkMsg("Select a lead first.");
+    if (!bk.email) return setBkMsg("Enter the client’s email — Cal sends their invite there.");
+    if (!bk.when) return setBkMsg("Pick a date & time.");
+    setBkMsg("Booking on the calendar…");
+    const res = await fetch("/api/cal/book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: bk.name || lead.name, email: bk.email, phone: normalize(bk.phone) || lead.phone,
+        business: bk.business || lead.business, notes: bk.notes,
+        start: bk.when, timeZone: bk.tz, leadId: lead.id,
+      }),
+    });
+    const b = await res.json().catch(() => ({}));
+    if (res.ok && b.ok) {
+      setBkMsg("Booked ✓ — invite sent to the client.");
+      setActiveId(null); activeRef.current = null; setLastCall(null); loadLeads();
+    } else {
+      setBkMsg(b.error || "Could not book on the calendar.");
     }
   }
 
@@ -444,6 +487,9 @@ export default function CallPage() {
                 </>
               )}
               {status === "live" && <div className="dialpad" style={{ marginTop: 12 }}>{["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((k) => (<button key={k} className="pad-key" onClick={() => padPress(k)}>{k}</button>))}</div>}
+              {status !== "idle" && (
+                <input value={dispoNotes} onChange={(e) => setDispoNotes(e.target.value)} placeholder="📝 Notes while on the call…" style={{ marginTop: 12 }} />
+              )}
             </div>
           </div>
 
@@ -467,27 +513,38 @@ export default function CallPage() {
             </div>
           )}
 
-          {status === "idle" && (
+          {(active || status === "idle") && (
             <div className="panel">
               <h2>📅 Book appointment{active ? ` · ${displayName(active)}` : ""}</h2>
               {!active ? (
-                <div className="muted">Select a lead on the left, then schedule a time to hand it to the closer.</div>
+                <div className="muted">Select a lead on the left to capture their details and schedule.</div>
               ) : (
                 <>
                   <div className="row2">
-                    <div><label>Date &amp; time</label><input type="datetime-local" value={bk.when} onChange={(e) => setBk({ ...bk, when: e.target.value })} /></div>
-                    <div><label>Notes for the closer</label><input value={bk.notes} onChange={(e) => setBk({ ...bk, notes: e.target.value })} placeholder="Context…" /></div>
+                    <div><label>Client name</label><input value={bk.name} onChange={(e) => setBk({ ...bk, name: e.target.value })} placeholder="Who you spoke with" /></div>
+                    <div><label>Client email (for their confirmation)</label><input type="email" value={bk.email} onChange={(e) => setBk({ ...bk, email: e.target.value })} placeholder="client@company.com" /></div>
                   </div>
+                  <div className="row2">
+                    <div><label>Phone</label><input value={bk.phone} onChange={(e) => setBk({ ...bk, phone: e.target.value })} /></div>
+                    <div><label>Business</label><input value={bk.business} onChange={(e) => setBk({ ...bk, business: e.target.value })} /></div>
+                  </div>
+                  <div className="row2">
+                    <div>
+                      <label>Client timezone</label>
+                      <select value={bk.tz} onChange={(e) => setBk({ ...bk, tz: e.target.value })}>
+                        {US_TZ.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    <div><label>Date &amp; time (client’s time)</label><input type="datetime-local" value={bk.when} onChange={(e) => setBk({ ...bk, when: e.target.value })} /></div>
+                  </div>
+                  <label>Notes / what they need</label>
+                  <input value={bk.notes} onChange={(e) => setBk({ ...bk, notes: e.target.value })} placeholder="Context for the closer…" />
                   <div className="actions" style={{ alignItems: "center" }}>
-                    <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
-                    <BookCall
-                      mirror
-                      ctx={{ leadId: active.id, name: active.name, business: active.business, phone: active.phone, notes: `${active.business ?? ""} ${active.phone}`.trim() }}
-                      label="📆 Schedule client meeting (Cal)"
-                    />
+                    <button className="btn-green" onClick={bookCal}>📆 Book &amp; send client invite</button>
+                    <button className="btn-ghost" onClick={bookAppointment}>Book without invite</button>
                     {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
                   </div>
-                  <div className="hint">“Schedule client meeting” opens the calendar — enter the client’s email so their confirmation is sent to them. It also shows here and on the closer/admin views.</div>
+                  <div className="hint">Bookable while on the call. “Book &amp; send client invite” emails the client via Cal (enter their email above) and shows on the closer/admin views; “without invite” just logs it in-app.</div>
                 </>
               )}
             </div>
