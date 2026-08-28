@@ -3,11 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { usernameToEmail } from "@/lib/auth";
 import "../call/call.css";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,13 +18,16 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: usernameToEmail(username),
+      password,
+    });
     if (error) {
-      setError(error.message);
+      setError("Wrong username or password.");
       setBusy(false);
       return;
     }
-    const next = new URLSearchParams(window.location.search).get("next") || "/call";
+    const next = new URLSearchParams(window.location.search).get("next") || "/";
     router.push(next);
     router.refresh();
   }
@@ -34,8 +38,8 @@ export default function LoginPage() {
         <h1 style={{ fontSize: "1.3rem", marginBottom: 4 }}>Rocky Solutions</h1>
         <div className="sub" style={{ marginBottom: 18 }}>Sign in to the call console.</div>
         <form onSubmit={onSubmit}>
-          <label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
+          <label>Username</label>
+          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="e.g. rakesh" />
           <label style={{ marginTop: 10, display: "block" }}>Password</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           <button className="btn-blue" type="submit" disabled={busy} style={{ width: "100%", marginTop: 16 }}>

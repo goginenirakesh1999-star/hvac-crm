@@ -5,10 +5,6 @@ export function getTwilioClient() {
   return twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
 }
 
-export async function sendSms(to: string, from: string, body: string) {
-  return getTwilioClient().messages.create({ to, from, body });
-}
-
 // Verifies X-Twilio-Signature. Returns true when WEBHOOK_BASE_URL is unset
 // (local development) so the routes still work before the deploy URL exists.
 export function isValidTwilioRequest(

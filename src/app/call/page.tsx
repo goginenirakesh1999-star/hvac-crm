@@ -1,483 +1,386 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
-import type { Call, Device } from "@twilio/voice-sdk";
+import { useDialer } from "@/lib/useDialer";
+import type { LeadStatus } from "@/lib/database.types";
 import "./call.css";
-
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/xqerkekp";
-
-// Ordered by value, best first. "Sending denials" is the only one that matters —
-// it is a live engagement, not a maybe. Everything else is a step toward it.
-const OUTCOMES = [
-  "Sending denials",
-  "Interested — call back",
-  "Gatekeeper — no decision-maker",
-  "Not interested",
-  "No answer",
-  "Voicemail",
-  "Wrong / bad number",
-  "Do not call",
-];
 
 interface Lead {
   id: string;
-  name: string;
-  number: string;
-  done: boolean;
+  name: string | null;
+  business: string | null;
+  phone: string;
+  status: LeadStatus;
+  attempts: number;
+  last_contacted_at: string | null;
+  callback_at: string | null;
+  notes: string | null;
 }
 
-interface LogEntry {
-  name: string;
-  number: string;
-  at: string;
-  durationSec: number;
-  outcome: string;
-  notes: string;
-  callSid: string;
-}
+const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
+  new: { label: "New", cls: "b-new" },
+  attempted: { label: "Attempted", cls: "b-att" },
+  contacted: { label: "Contacted", cls: "b-con" },
+  callback: { label: "Callback", cls: "b-cb" },
+  appointment: { label: "Appointment", cls: "b-appt" },
+  won: { label: "Won", cls: "b-won" },
+  lost: { label: "Lost", cls: "b-lost" },
+  dnc: { label: "DNC", cls: "b-lost" },
+};
+
+// Call dispositions → the pipeline stage they move the lead to.
+const DISPOSITIONS: { label: string; status: LeadStatus; callback?: boolean }[] = [
+  { label: "No answer", status: "attempted" },
+  { label: "Busy", status: "attempted" },
+  { label: "Voicemail", status: "attempted" },
+  { label: "Spoke — call back", status: "callback", callback: true },
+  { label: "Spoke — interested", status: "contacted" },
+  { label: "Gatekeeper", status: "contacted" },
+  { label: "Not interested", status: "lost" },
+  { label: "Do not call", status: "dnc" },
+];
+
+type Tab = "followup" | "new" | "working" | "all";
 
 function normalize(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
   if (raw.trim().startsWith("+") && digits.length >= 8) return `+${digits}`;
-  if (digits.length === 10) return `+1${digits}`; // US local
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`; // US with 1
-  if (digits.length >= 11 && digits.length <= 15) return `+${digits}`; // international w/ country code
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length >= 11 && digits.length <= 15) return `+${digits}`;
   return null;
 }
-
-function parseLeads(text: string): Lead[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, i) => {
-      const parts = line.split(/[,\t]/).map((p) => p.trim());
-      // "Name, number" or "number" or "number, Name"
-      let name = "";
-      let number: string | null = null;
-      for (const p of parts) {
-        const n = normalize(p);
-        if (n && !number) number = n;
-        else if (p) name = name ? `${name} ${p}` : p;
-      }
-      return number ? { id: `${i}-${number}`, name: name || number, number, done: false } : null;
-    })
-    .filter((l): l is Lead => l !== null);
-}
+const displayName = (l: Lead) => l.business || l.name || l.phone;
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
 
 export default function CallPage() {
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
-  const [leadText, setLeadText] = useState("");
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [tab, setTab] = useState<Tab>("followup");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "connecting" | "live">("idle");
-  const [seconds, setSeconds] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [outcome, setOutcome] = useState(OUTCOMES[0]);
-  const [notes, setNotes] = useState("");
-  const [log, setLog] = useState<LogEntry[]>([]);
-  const [dialInput, setDialInput] = useState("");
-  // On by default for the team: calls are recorded for QA and conversion review.
-  // The callee hears a "may be recorded" notice before being bridged in (the
-  // standard all-party-consent mitigation). Uncheck to turn off per session.
   const [record, setRecord] = useState(true);
+  const [dialInput, setDialInput] = useState("");
 
-  const deviceRef = useRef<Device | null>(null);
-  const callRef = useRef<Call | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startedAtRef = useRef<number>(0);
+  // disposition (shown after a call to the active lead)
+  const [dispo, setDispo] = useState(DISPOSITIONS[0].label);
+  const [dispoNotes, setDispoNotes] = useState("");
+  const [callbackWhen, setCallbackWhen] = useState("");
+  const [lastCall, setLastCall] = useState<{ durationSec: number; callSid: string } | null>(null);
+  const [msg, setMsg] = useState("");
 
+  // booking
+  const [bk, setBk] = useState({ when: "", notes: "" });
+  const [bkMsg, setBkMsg] = useState("");
+
+  const activeRef = useRef<Lead | null>(null);
+
+  const dialer = useDialer(({ durationSec, callSid }) => {
+    const lead = activeRef.current;
+    if (!lead) {
+      // ad-hoc manual call — log it without a lead
+      fetch("/api/calls/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dealership_phone: lastManualRef.current || "manual",
+          twilio_call_sid: callSid,
+          status: durationSec > 0 ? "completed" : "no-answer",
+          duration_seconds: durationSec,
+          outcome: "Manual call",
+        }),
+      }).catch(() => {});
+      return;
+    }
+    setLastCall({ durationSec, callSid });
+  });
+  const { status } = dialer;
+  const lastManualRef = useRef("");
+
+  async function loadLeads() {
+    try {
+      const res = await fetch("/api/leads");
+      const body = await res.json();
+      if (body.ok) setLeads(body.leads as Lead[]);
+    } catch {
+      /* ignore */
+    }
+  }
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      deviceRef.current?.destroy();
-    };
+    loadLeads();
   }, []);
 
-  async function connectDevice(): Promise<Device | null> {
-    if (deviceRef.current) return deviceRef.current;
-    setError("");
-    try {
-      const res = await fetch("/api/voice/token");
-      if (!res.ok) throw new Error("Could not get a calling token. Is the backend configured?");
-      const { token } = await res.json();
-      const { Device } = await import("@twilio/voice-sdk");
-      const device = new Device(token, { codecPreferences: ["opus", "pcmu"] as never });
-      device.on("error", (e: { message: string }) => setError(e.message));
-      await device.register();
-      deviceRef.current = device;
-      setReady(true);
-      return device;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to connect device.");
-      return null;
-    }
+  function selectLead(l: Lead) {
+    setActiveId(l.id);
+    activeRef.current = l;
+    setLastCall(null);
+    setDispo(DISPOSITIONS[0].label);
+    setDispoNotes("");
+    setCallbackWhen("");
+    setBk({ when: "", notes: "" });
+    setMsg("");
+    setBkMsg("");
   }
 
-  function startTimer() {
-    startedAtRef.current = Date.now();
-    setSeconds(0);
-    timerRef.current = setInterval(() => {
-      setSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
-    }, 1000);
-  }
-  function stopTimer() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-  }
-
-  // Dialpad: during a live call, keys send DTMF tones (phone menus);
-  // otherwise they build up a number to dial manually.
-  function padPress(key: string) {
-    if (status === "live") {
-      callRef.current?.sendDigits(key);
-    } else if (status === "idle") {
-      setDialInput((prev) => (prev + key).slice(0, 18));
-    }
+  function callLead(l: Lead) {
+    if (status !== "idle") return;
+    selectLead(l);
+    dialer.call(l.phone, record);
   }
 
   function manualCall() {
-    const number = normalize(dialInput);
-    if (!number) {
-      setError("Enter a valid number to dial, e.g. 201-555-1234");
-      return;
-    }
-    callLead({ id: `manual-${Date.now()}`, name: number, number, done: false });
-  }
-
-  async function callLead(lead: Lead) {
     if (status !== "idle") return;
-    setError("");
-    setActiveId(lead.id);
-    setOutcome(OUTCOMES[0]);
-    setNotes("");
-    setMuted(false);
-    setStatus("connecting");
-    const device = await connectDevice();
-    if (!device) {
-      setStatus("idle");
-      setActiveId(null);
-      return;
-    }
-    try {
-      const call = await device.connect({
-        params: { To: lead.number, Record: record ? "1" : "0" },
-      });
-      callRef.current = call;
-      call.on("accept", () => {
-        setStatus("live");
-        startTimer();
-      });
-      call.on("disconnect", () => finalizeCall(lead));
-      call.on("cancel", () => finalizeCall(lead));
-      call.on("error", (e: { message: string }) => {
-        setError(e.message);
-        finalizeCall(lead);
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Call failed.");
-      setStatus("idle");
-      setActiveId(null);
-    }
+    const number = normalize(dialInput);
+    if (!number) return dialer.setError("Enter a valid number, e.g. 201-555-1234");
+    setActiveId(null);
+    activeRef.current = null;
+    lastManualRef.current = number;
+    dialer.call(number, record);
   }
 
-  function finalizeCall(lead: Lead) {
-    stopTimer();
-    const dur = status === "live" ? Math.floor((Date.now() - startedAtRef.current) / 1000) : 0;
-    const callSid = (callRef.current?.parameters?.CallSid as string) || "";
-    const finalOutcome = outcome;
-    const finalNotes = notes;
-    setLog((prev) => [
-      {
-        name: lead.name,
-        number: lead.number,
-        at: new Date().toLocaleString(),
-        durationSec: dur,
-        outcome: finalOutcome,
-        notes: finalNotes,
-        callSid,
-      },
-      ...prev,
-    ]);
-    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, done: true } : l)));
-    callRef.current = null;
-    setStatus("idle");
-    setActiveId(null);
-    setSeconds(0);
+  function padPress(key: string) {
+    if (status === "live") dialer.sendDigits(key);
+    else if (status === "idle") setDialInput((p) => (p + key).slice(0, 18));
+  }
 
-    // Persist to the database, attributed to the signed-in agent (server-side).
-    // Fire-and-forget: a logging hiccup must never block the next call.
-    fetch("/api/calls/log", {
+  async function saveDisposition() {
+    const lead = activeRef.current;
+    if (!lead) return;
+    const d = DISPOSITIONS.find((x) => x.label === dispo)!;
+    if (d.callback && !callbackWhen) return setMsg("Pick a callback date & time.");
+    setMsg("Saving…");
+
+    const stamped = `[${new Date().toLocaleString()}] ${d.label}${dispoNotes ? ": " + dispoNotes : ""}`;
+    const notes = [lead.notes, stamped].filter(Boolean).join("\n");
+
+    await fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: d.status,
+        attempts: (lead.attempts ?? 0) + 1,
+        last_contacted_at: new Date().toISOString(),
+        callback_at: d.callback ? new Date(callbackWhen).toISOString() : null,
+        notes,
+      }),
+    });
+    await fetch("/api/calls/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        dealership_name: lead.name,
-        dealership_phone: lead.number,
-        twilio_call_sid: callSid,
-        status: dur > 0 ? "completed" : "no-answer",
-        duration_seconds: dur,
-        outcome: finalOutcome,
-        notes: finalNotes,
-        is_conversion: finalOutcome === "Sending denials",
+        dealership_name: displayName(lead),
+        dealership_phone: lead.phone,
+        twilio_call_sid: lastCall?.callSid ?? "",
+        status: (lastCall?.durationSec ?? 0) > 0 ? "completed" : "no-answer",
+        duration_seconds: lastCall?.durationSec ?? 0,
+        outcome: d.label,
+        notes: dispoNotes,
+        lead_id: lead.id,
       }),
-    }).catch(() => {});
-  }
-
-  function hangup() {
-    callRef.current?.disconnect();
-  }
-  function toggleMute() {
-    const c = callRef.current;
-    if (!c) return;
-    const next = !muted;
-    c.mute(next);
-    setMuted(next);
-  }
-
-  function mergeLeads(incoming: Lead[]) {
-    setLeads((prev) => {
-      const seen = new Set(prev.map((l) => l.number));
-      const merged = [...prev];
-      for (const l of incoming) {
-        if (!seen.has(l.number)) {
-          merged.push(l);
-          seen.add(l.number);
-        }
-      }
-      return merged;
     });
+
+    setActiveId(null);
+    activeRef.current = null;
+    setLastCall(null);
+    setMsg("");
+    loadLeads();
   }
 
-  function loadLeads() {
-    mergeLeads(parseLeads(leadText));
-  }
-
-  // Import leads from a CSV or Excel (.xlsx/.xls) file. Any column that looks
-  // like a phone number is used as the number; other cells become the name.
-  async function importFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError("");
-    try {
-      let text: string;
-      if (/\.(xlsx|xls)$/i.test(file.name)) {
-        const XLSX = await import("xlsx");
-        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-        text = rows.map((r) => (Array.isArray(r) ? r.join(",") : "")).join("\n");
-      } else {
-        text = await file.text();
-      }
-      const parsed = parseLeads(text);
-      if (!parsed.length) {
-        setError("No valid phone numbers found in that file. Include a column with phone numbers.");
-        return;
-      }
-      mergeLeads(parsed);
-    } catch {
-      setError("Could not read that file. Use a CSV or Excel file with name and phone columns.");
-    } finally {
-      e.target.value = "";
+  async function bookAppointment() {
+    const lead = activeRef.current;
+    if (!lead) return setBkMsg("Select a lead first.");
+    if (!bk.when) return setBkMsg("Pick a date & time.");
+    setBkMsg("Booking…");
+    const res = await fetch("/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prospect_name: lead.name,
+        prospect_business: lead.business,
+        prospect_phone: lead.phone,
+        scheduled_at: new Date(bk.when).toISOString(),
+        notes: bk.notes,
+        lead_id: lead.id,
+      }),
+    });
+    if (res.ok) {
+      setBkMsg("Appointment booked ✓ — sent to the closer.");
+      setBk({ when: "", notes: "" });
+      setActiveId(null);
+      activeRef.current = null;
+      setLastCall(null);
+      loadLeads();
+    } else {
+      const b = await res.json().catch(() => ({}));
+      setBkMsg(b.error || "Could not book.");
     }
   }
 
-  function csv(): string {
-    const head = "Business,Number,Time,Duration(s),Outcome,Notes,CallSid";
-    const rows = log.map((e) =>
-      [e.name, e.number, e.at, e.durationSec, e.outcome, e.notes.replace(/"/g, "'"), e.callSid]
-        .map((c) => `"${String(c)}"`)
-        .join(",")
-    );
-    return [head, ...rows].join("\n");
-  }
-  function exportCsv() {
-    const blob = new Blob([csv()], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `rocky-call-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-  }
-  async function emailReport() {
-    const summary = log
-      .map((e) => `${e.name} (${e.number}) — ${e.outcome}, ${e.durationSec}s\n  ${e.notes}`)
-      .join("\n\n");
-    await fetch(FORMSPREE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        _subject: `Cold-call report — ${log.length} calls — ${new Date().toLocaleDateString()}`,
-        message: summary || "No calls logged.",
-      }),
-    });
-    alert("Report emailed.");
-  }
+  const now = Date.now();
+  const followups = leads
+    .filter((l) => l.status === "callback")
+    .sort((a, b) => (a.callback_at ?? "").localeCompare(b.callback_at ?? ""));
+  const fresh = leads.filter((l) => l.status === "new");
+  const working = leads.filter((l) => l.status === "attempted" || l.status === "contacted");
+  const dueCount = followups.filter((l) => l.callback_at && new Date(l.callback_at).getTime() <= now).length;
 
-  const activeLead = leads.find((l) => l.id === activeId);
-  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const ss = String(seconds % 60).padStart(2, "0");
+  const shown = tab === "followup" ? followups : tab === "new" ? fresh : tab === "working" ? working : leads;
+  const active = leads.find((l) => l.id === activeId) ?? activeRef.current;
+  const d = DISPOSITIONS.find((x) => x.label === dispo)!;
+  const mm = String(Math.floor(dialer.seconds / 60)).padStart(2, "0");
+  const ss = String(dialer.seconds % 60).padStart(2, "0");
+
+  const TABS: [Tab, string, number][] = [
+    ["followup", "Follow-ups", followups.length],
+    ["new", "New", fresh.length],
+    ["working", "Working", working.length],
+    ["all", "All", leads.length],
+  ];
 
   return (
     <div className="cp">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+      <div className="topbar">
         <div>
-          <h1>Rocky Solutions — Call Console</h1>
+          <h1>Call Console</h1>
           <div className="sub">
-            Equipment dealers, from your assigned number. Ask for denied warranty claims, not for a meeting.
-            {record
-              ? " Recording is ON — the callee hears a notice first."
-              : " Recording is OFF."}
+            Your assigned leads. {dueCount > 0 && <strong className="conv">{dueCount} follow-up{dueCount > 1 ? "s" : ""} due now.</strong>} Recording is {record ? "ON" : "OFF"}.
           </div>
         </div>
-        <form action="/api/auth/signout" method="post">
-          <button className="btn-ghost" type="submit">Sign out</button>
-        </form>
+        <div className="topbar-actions">
+          <button className="btn-ghost" onClick={loadLeads}>Refresh</button>
+          {!dialer.ready && <button className="btn-blue" onClick={() => dialer.connectDevice()}>Connect phone</button>}
+          {dialer.ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
+          <form action="/api/auth/signout" method="post"><button className="btn-ghost" type="submit">Sign out</button></form>
+        </div>
       </div>
 
-      {error && <div className="banner">{error}</div>}
+      {dialer.error && <div className="banner">{dialer.error}</div>}
 
       <div className="grid">
-        {/* LEFT: leads */}
+        {/* LEFT: lead queues */}
         <div className="panel">
-          <h2>Leads</h2>
-          <textarea
-            placeholder={"One per line:\nCool Air HVAC, 201-555-1234\nHudson Heating, +12015559876"}
-            value={leadText}
-            onChange={(e) => setLeadText(e.target.value)}
-          />
-          <div className="actions">
-            <button className="btn-ghost" onClick={loadLeads}>Load pasted</button>
-            <label className="btn-ghost" style={{ cursor: "pointer" }}>
-              Import CSV / Excel
-              <input type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={importFile} style={{ display: "none" }} />
-            </label>
-            {!ready && <button className="btn-blue" onClick={() => connectDevice()}>Connect phone</button>}
-            {ready && <span className="hint" style={{ alignSelf: "center" }}>Phone ready ✓</span>}
-          </div>
-          <label className="hint" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-            <input
-              type="checkbox"
-              checked={record}
-              disabled={status !== "idle"}
-              onChange={(e) => setRecord(e.target.checked)}
-            />
-            Record calls — on by default (callee hears a notice); uncheck to turn off
-          </label>
-          {leads.map((l) => (
-            <div key={l.id} className={`lead ${l.id === activeId ? "active" : ""} ${l.done ? "done" : ""}`}>
-              <div>
-                <div className="nm">{l.name}</div>
-                <div className="ph">{l.number}</div>
-              </div>
-              <button
-                className="btn-green"
-                disabled={status !== "idle"}
-                onClick={() => callLead(l)}
-              >
-                Call
+          <div className="segmented" style={{ display: "flex", marginBottom: 12 }}>
+            {TABS.map(([t, label, n]) => (
+              <button key={t} className={`seg ${t === tab ? "on" : ""}`} onClick={() => setTab(t)} style={{ border: "none", background: t === tab ? undefined : "transparent" }}>
+                {label} {n > 0 && <span className="tab-n">{n}</span>}
               </button>
-            </div>
-          ))}
+            ))}
+          </div>
+          <label className="hint" style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <input type="checkbox" checked={record} disabled={status !== "idle"} onChange={(e) => setRecord(e.target.checked)} />
+            Record calls (on by default)
+          </label>
+
+          {!shown.length && <div className="muted" style={{ padding: "8px 0" }}>Nothing here. {tab === "followup" ? "No callbacks scheduled." : "Ask your admin to assign leads."}</div>}
+          {shown.map((l) => {
+            const due = l.callback_at && new Date(l.callback_at).getTime() <= now;
+            return (
+              <div key={l.id} className={`lead ${l.id === activeId ? "active" : ""}`} onClick={() => selectLead(l)}>
+                <div>
+                  <div className="nm">{displayName(l)} <span className={`badge ${STATUS_META[l.status].cls}`}>{STATUS_META[l.status].label}</span></div>
+                  <div className="ph">{l.phone}{l.attempts > 0 && ` · ${l.attempts} attempt${l.attempts > 1 ? "s" : ""}`}</div>
+                  {l.status === "callback" && l.callback_at && (
+                    <div className={`ph ${due ? "conv" : ""}`}>⏰ {fmt(l.callback_at)}{due ? " · due" : ""}</div>
+                  )}
+                </div>
+                <button className="btn-green" disabled={status !== "idle"} onClick={(e) => { e.stopPropagation(); callLead(l); }}>Call</button>
+              </div>
+            );
+          })}
         </div>
 
-        {/* RIGHT: dialer + notes + log */}
+        {/* RIGHT: active call / disposition / booking / manual */}
         <div style={{ display: "grid", gap: 20 }}>
           <div className="panel">
             <h2>Active call</h2>
             <div className="dialer">
-              {status === "idle" && <div className="status">Idle — pick a lead and press Call.</div>}
+              {status === "idle" && !active && <div className="status">Pick a lead on the left, or dial manually below.</div>}
+              {active && status === "idle" && !lastCall && (
+                <div className="status">{displayName(active)} — press Call, or log without calling.</div>
+              )}
               {status === "connecting" && (
                 <>
-                  <div className="callee">{activeLead?.name}</div>
-                  <div className="status">Connecting… (allow microphone if prompted)</div>
+                  <div className="callee">{active ? displayName(active) : dialInput}</div>
+                  <div className="status">Connecting…</div>
+                  <div className="controls"><button className="btn-red" onClick={dialer.hangup}>Cancel</button></div>
                 </>
               )}
               {status === "live" && (
                 <>
-                  <div className="callee">{activeLead?.name}</div>
+                  <div className="callee">{active ? displayName(active) : dialInput}</div>
                   <div className="status live">● On call</div>
                   <div className="timer">{mm}:{ss}</div>
                   <div className="controls">
-                    <button className="btn-ghost" onClick={toggleMute}>{muted ? "Unmute" : "Mute"}</button>
-                    <button className="btn-red" onClick={hangup}>Hang up</button>
+                    <button className="btn-ghost" onClick={dialer.toggleMute}>{dialer.muted ? "Unmute" : "Mute"}</button>
+                    <button className="btn-red" onClick={dialer.hangup}>Hang up</button>
                   </div>
                 </>
               )}
 
-              {/* Dialpad: manual dial when idle, DTMF keypad when live */}
               {status === "idle" && (
                 <>
-                  <input
-                    className="dial-display"
-                    value={dialInput}
-                    onChange={(e) => setDialInput(e.target.value)}
-                    placeholder="Type or tap a number"
-                  />
-                  <div className="hint" style={{ textAlign: "center", marginTop: -6, marginBottom: 6 }}>
-                    US: 10 digits. International: include country code (e.g. 91 for India → 919XXXXXXXXX).
-                  </div>
-                </>
-              )}
-              {(status === "idle" || status === "live") && (
-                <>
+                  <input className="dial-display" value={dialInput} onChange={(e) => setDialInput(e.target.value)} placeholder="Manual dial" />
                   <div className="dialpad">
                     {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((k) => (
                       <button key={k} className="pad-key" onClick={() => padPress(k)}>{k}</button>
                     ))}
                   </div>
-                  {status === "idle" && (
-                    <div className="controls" style={{ marginTop: 12 }}>
-                      <button className="btn-ghost" onClick={() => setDialInput((p) => p.slice(0, -1))} disabled={!dialInput}>⌫</button>
-                      <button className="btn-green" onClick={manualCall} disabled={!dialInput || status !== "idle"}>Call this number</button>
-                    </div>
-                  )}
-                  {status === "live" && <div className="hint">Tap keys to send tones (e.g. phone menus)</div>}
+                  <div className="controls" style={{ marginTop: 12 }}>
+                    <button className="btn-ghost" onClick={() => setDialInput((p) => p.slice(0, -1))} disabled={!dialInput}>⌫</button>
+                    <button className="btn-green" onClick={manualCall} disabled={!dialInput}>Dial</button>
+                  </div>
                 </>
               )}
+              {status === "live" && <div className="dialpad" style={{ marginTop: 12 }}>{["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((k) => (<button key={k} className="pad-key" onClick={() => padPress(k)}>{k}</button>))}</div>}
             </div>
-            {(status === "live" || status === "connecting") && (
-              <div className="row2">
-                <div>
-                  <label>Outcome</label>
-                  <select value={outcome} onChange={(e) => setOutcome(e.target.value)}>
-                    {OUTCOMES.map((o) => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label>Notes</label>
-                  <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What happened…" />
-                </div>
-              </div>
-            )}
           </div>
 
-          <div className="panel">
-            <h2>Call report ({log.length})</h2>
-            <div className="actions">
-              <button className="btn-ghost" onClick={exportCsv} disabled={!log.length}>Export CSV</button>
-              <button className="btn-blue" onClick={emailReport} disabled={!log.length}>Email report</button>
+          {/* Disposition — log the outcome of a call to the active lead */}
+          {active && status === "idle" && (
+            <div className="panel">
+              <h2>Log call · {displayName(active)}</h2>
+              {active.notes && <div className="appt-notes" style={{ whiteSpace: "pre-wrap", marginBottom: 10 }}>{active.notes}</div>}
+              <div className="row2">
+                <div>
+                  <label>Disposition</label>
+                  <select value={dispo} onChange={(e) => setDispo(e.target.value)}>
+                    {DISPOSITIONS.map((o) => <option key={o.label}>{o.label}</option>)}
+                  </select>
+                </div>
+                {d.callback && (
+                  <div>
+                    <label>Callback at</label>
+                    <input type="datetime-local" value={callbackWhen} onChange={(e) => setCallbackWhen(e.target.value)} />
+                  </div>
+                )}
+              </div>
+              <label>Notes</label>
+              <input value={dispoNotes} onChange={(e) => setDispoNotes(e.target.value)} placeholder="What happened on the call…" />
+              <div className="actions" style={{ alignItems: "center" }}>
+                <button className="btn-blue" onClick={saveDisposition}>Save call</button>
+                {msg && <span className="hint" style={{ margin: 0 }}>{msg}</span>}
+              </div>
             </div>
-            <table>
-              <thead>
-                <tr><th>Business</th><th>Time</th><th>Dur</th><th>Outcome</th><th>Notes</th><th>Recording</th></tr>
-              </thead>
-              <tbody>
-                {log.map((e, i) => (
-                  <tr key={i}>
-                    <td>{e.name}<br /><span className="ph">{e.number}</span></td>
-                    <td>{e.at}</td>
-                    <td>{e.durationSec}s</td>
-                    <td>{e.outcome}</td>
-                    <td>{e.notes}</td>
-                    <td>{e.callSid ? <a href={`/api/voice/recording-media?callSid=${e.callSid}`} target="_blank" rel="noreferrer">▶ Play</a> : "—"}</td>
-                  </tr>
-                ))}
-                {!log.length && <tr><td colSpan={6} style={{ color: "var(--muted)" }}>No calls yet.</td></tr>}
-              </tbody>
-            </table>
-            <div className="hint">Recordings take a few seconds to process after hang-up before playback works.</div>
-          </div>
+          )}
+
+          {/* Book appointment for the active lead → hands off to the closer */}
+          {active && status === "idle" && (
+            <div className="panel">
+              <h2>Book appointment · {displayName(active)}</h2>
+              <div className="row2">
+                <div>
+                  <label>Date &amp; time</label>
+                  <input type="datetime-local" value={bk.when} onChange={(e) => setBk({ ...bk, when: e.target.value })} />
+                </div>
+                <div>
+                  <label>Notes for the closer</label>
+                  <input value={bk.notes} onChange={(e) => setBk({ ...bk, notes: e.target.value })} placeholder="Context…" />
+                </div>
+              </div>
+              <div className="actions" style={{ alignItems: "center" }}>
+                <button className="btn-green" onClick={bookAppointment}>Book &amp; hand to closer</button>
+                {bkMsg && <span className="hint" style={{ margin: 0 }}>{bkMsg}</span>}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

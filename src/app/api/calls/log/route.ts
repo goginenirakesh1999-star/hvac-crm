@@ -10,6 +10,7 @@ interface LogBody {
   outcome?: string;
   notes?: string;
   is_conversion?: boolean;
+  lead_id?: string;
 }
 
 // Persists one finished call, attributed to the signed-in agent. The agent_id
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
       outcome: body.outcome ?? null,
       notes: body.notes ?? null,
       is_conversion: body.is_conversion ?? false,
+      lead_id: body.lead_id ?? null,
     })
     .select("id")
     .single();

@@ -13,8 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // From="client:<agent-id>", and we look up that agent's twilio_number. Falls back
 // to the shared TWILIO_CALLER_ID if the agent has no number assigned yet.
 //
-// Recording is opt-in per call (Record=1 from the console). When on, the callee
-// hears a notice before being bridged in.
+// Recording is opt-in per call (Record=1 from the console), on by default.
 export async function POST(req: NextRequest) {
   const form = await req.formData();
 
@@ -53,12 +52,11 @@ export async function POST(req: NextRequest) {
       ` recordingStatusCallback="${origin}/api/voice/recording"` +
       ` recordingStatusCallbackEvent="completed"`
     : "";
-  const whisper = record ? ` url="${origin}/api/voice/whisper"` : "";
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial callerId="${callerId}" answerOnBridge="true"${recordAttrs}>
-    <Number${whisper}>${to}</Number>
+    <Number>${to}</Number>
   </Dial>
 </Response>`;
 
