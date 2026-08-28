@@ -50,7 +50,7 @@ export default function AppointmentsPage() {
   const activeApptRef = useRef<Appt | null>(null);
   const [activeName, setActiveName] = useState("");
 
-  const dialer = useDialer(({ callSid }) => {
+  const dialer = useDialer(({ durationSec, callSid }) => {
     const appt = activeApptRef.current;
     activeApptRef.current = null;
     if (appt && callSid) {
@@ -59,6 +59,19 @@ export default function AppointmentsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ twilio_call_sid: callSid }),
+      }).catch(() => {});
+      // also log it as a call so it shows in the admin's Call Activity (with recording)
+      fetch("/api/calls/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dealership_name: appt.prospect_name || appt.prospect_business || appt.prospect_phone,
+          dealership_phone: appt.prospect_phone,
+          twilio_call_sid: callSid,
+          status: durationSec > 0 ? "completed" : "no-answer",
+          duration_seconds: durationSec,
+          outcome: "Closer call",
+        }),
       }).catch(() => {});
     }
   });
