@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDialer } from "@/lib/useDialer";
 import type { LeadStatus } from "@/lib/database.types";
+import Quote from "../Quote";
 import "./call.css";
 
 interface Lead {
@@ -236,7 +237,7 @@ export default function CallPage() {
   ];
 
   return (
-    <div className="cp">
+    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/drive4.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div>
           <h1>Call Console</h1>
@@ -252,6 +253,7 @@ export default function CallPage() {
         </div>
       </div>
 
+      <Quote />
       {dialer.error && <div className="banner">{dialer.error}</div>}
 
       <div className="grid">

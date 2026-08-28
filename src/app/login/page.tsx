@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { usernameToEmail } from "@/lib/auth";
+import Quote from "../Quote";
 import "../call/call.css";
 
 export default function LoginPage() {
@@ -33,10 +34,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="cp" style={{ display: "grid", placeItems: "center" }}>
-      <div className="panel" style={{ width: "100%", maxWidth: 380 }}>
-        <h1 style={{ fontSize: "1.3rem", marginBottom: 4 }}>Rocky Solutions</h1>
-        <div className="sub" style={{ marginBottom: 18 }}>Sign in to the call console.</div>
+    <div className="cp hero" style={{ display: "grid", placeItems: "center", ["--wall" as string]: "url(/wallpapers/aurora1.jpg)" } as React.CSSProperties}>
+      <div className="panel" style={{ width: "100%", maxWidth: 400 }}>
+        <h1 style={{ fontSize: "1.35rem", marginBottom: 4 }}>Rocky Solutions</h1>
+        <div className="sub" style={{ marginBottom: 8 }}>Sign in to the call console.</div>
+        <Quote hero />
         <form onSubmit={onSubmit}>
           <label>Username</label>
           <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="e.g. rakesh" />

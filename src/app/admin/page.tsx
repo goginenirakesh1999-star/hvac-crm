@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { AgentRole } from "@/lib/database.types";
 import LeadManager from "./LeadManager";
+import Quote from "../Quote";
 import "../call/call.css";
 
 export const dynamic = "force-dynamic";
@@ -195,7 +196,7 @@ export default async function AdminPage({
   const showTarget = rangeKey === "today";
 
   return (
-    <div className="cp">
+    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/midnight2.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div>
           <h1>Team Dashboard</h1>
@@ -217,6 +218,8 @@ export default async function AdminPage({
           </form>
         </div>
       </div>
+
+      <Quote />
 
       {/* Summary stat cards */}
       <div className="stats">

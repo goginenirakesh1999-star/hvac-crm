@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDialer } from "@/lib/useDialer";
+import Quote from "../Quote";
 import "../call/call.css";
 
 interface Appt {
@@ -112,7 +113,7 @@ export default function AppointmentsPage() {
   const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
-    <div className="cp">
+    <div className="cp" style={{ ["--wall" as string]: "url(/wallpapers/focus3.jpg)" } as React.CSSProperties}>
       <div className="topbar">
         <div>
           <h1>Closer — Appointments</h1>
@@ -126,6 +127,7 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
+      <Quote />
       {dialer.error && <div className="banner">{dialer.error}</div>}
 
       {/* Live call bar */}

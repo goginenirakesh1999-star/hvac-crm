@@ -11,12 +11,31 @@
   --red: #ec5b5b;
   --amber: #f0b53f;
   min-height: 100vh;
-  background: radial-gradient(1200px 600px at 80% -10%, #16294380, transparent), var(--bg);
+  background: transparent;
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
   padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
+  position: relative;
+}
+
+/* Fixed wallpaper backdrop — heavily darkened so solid panels stay readable.
+   Each page sets --wall to its own image; falls back to a plain dark wash. */
+.cp::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(180deg, rgba(9,16,26,0.90), rgba(9,16,26,0.955)),
+    radial-gradient(1100px 560px at 82% -10%, rgba(47,127,240,0.18), transparent),
+    var(--wall, none);
+  background-size: cover;
+  background-position: center;
+}
+.cp.hero::before {
+  background-image: linear-gradient(180deg, rgba(9,16,26,0.70), rgba(9,16,26,0.90)),
+    var(--wall, none);
 }
 .cp h1 { font-size: 1.45rem; margin-bottom: 2px; font-weight: 700; }
 .cp .sub { color: var(--muted); font-size: 0.9rem; }
@@ -135,3 +154,9 @@
 .cp .banner { background: rgba(236,91,91,0.12); border: 1px solid var(--red); color: #ffb4b4; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; }
 .cp .hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
 .cp a { color: #7db5ee; }
+
+/* Motivational quote strip */
+.cp .quote { margin: 0 0 18px; padding: 10px 16px; border-left: 3px solid var(--blue); background: rgba(20,36,60,0.5); border-radius: 0 10px 10px 0; font-size: 0.95rem; font-style: italic; }
+.cp .quote span { color: var(--muted); font-style: normal; font-size: 0.82rem; margin-left: 6px; }
+.cp .quote-hero { font-size: 1.3rem; line-height: 1.5; font-weight: 600; font-style: italic; margin: 20px 0 4px; }
+.cp .quote-hero span { display: block; color: var(--muted); font-size: 0.88rem; font-weight: 400; font-style: normal; margin-top: 8px; }
