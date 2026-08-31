@@ -8,9 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 type Role = "admin" | "closer" | "caller";
 
 const LINKS: Record<Role, [string, string][]> = {
-  admin: [["/admin", "📊 Dashboard"], ["/appointments", "📅 Appointments"], ["/call", "📞 Console"]],
-  closer: [["/appointments", "📅 Appointments"], ["/call", "📞 Console"]],
-  caller: [["/call", "📞 Console"], ["/appointments", "📅 Appointments"]],
+  admin: [["/admin", "📊 Dashboard"], ["/appointments", "📅 Appointments"], ["/call", "📞 Console"], ["/account", "🔑 Password"]],
+  closer: [["/appointments", "📅 Appointments"], ["/call", "📞 Console"], ["/account", "🔑 Password"]],
+  caller: [["/call", "📞 Console"], ["/appointments", "📅 Appointments"], ["/account", "🔑 Password"]],
 };
 
 export default function SideNav() {

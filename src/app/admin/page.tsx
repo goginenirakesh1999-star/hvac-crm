@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { AgentRole } from "@/lib/database.types";
 import LeadManager from "./LeadManager";
+import TeamAccess from "./TeamAccess";
 import Quote from "../Quote";
 import SideNav from "../SideNav";
 import BookCall from "../BookCall";
@@ -195,6 +196,8 @@ export default async function AdminPage({
 
   const showTarget = rangeKey === "today";
 
+  const teamMembers = staffRows.map((r) => ({ id: r.id, name: r.agent, role: r.role }));
+
   return (
     <>
     <SideNav />
@@ -263,6 +266,8 @@ export default async function AdminPage({
           </table>
         </div>
       </div>
+
+      <TeamAccess members={teamMembers} />
 
       {/* Detailed call log with notes + recordings */}
       <div className="panel">
