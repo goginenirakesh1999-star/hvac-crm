@@ -19,12 +19,29 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: usernameToEmail(username),
-      password,
-    });
+    let error;
+    try {
+      ({ error } = await supabase.auth.signInWithPassword({
+        email: usernameToEmail(username),
+        password,
+      }));
+    } catch {
+      setError("Can't reach the server. Check your connection and try again.");
+      setBusy(false);
+      return;
+    }
     if (error) {
-      setError("Wrong username or password.");
+      // Only genuine bad credentials get the generic message. Anything else --
+      // rate limits, outages -- is shown as-is, or the person stuck on it has
+      // no way to tell why retrying keeps failing.
+      const m = error.message.toLowerCase();
+      if (m.includes("invalid login credentials")) {
+        setError("Wrong username or password.");
+      } else if (m.includes("rate limit") || m.includes("too many")) {
+        setError("Too many attempts. Wait a minute, then try again.");
+      } else {
+        setError(error.message);
+      }
       setBusy(false);
       return;
     }

@@ -5,7 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // admin dashboard, and the Twilio token/recording endpoints behind a login.
 // Twilio's own webhooks (/api/voice/outbound, /whisper, /recording) are NOT
 // matched here — they authenticate via X-Twilio-Signature instead.
-const PROTECTED = ["/call", "/admin", "/appointments", "/api/voice/token", "/api/voice/recording-media"];
+const PROTECTED = ["/call", "/admin", "/appointments", "/account", "/api/admin",
+                   "/api/voice/token", "/api/voice/recording-media"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
