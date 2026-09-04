@@ -12,7 +12,8 @@ export interface FinishedCall {
 
 // Browser softphone shared by the caller console and the closer agenda.
 // `onFinish` fires once per call with the real talk duration (0 if never
-// answered) and the Twilio CallSid, so each page can log/record as it needs.
+// answered) and the Twilio CallSid, so each page can log as it needs.
+// Every call is recorded; the server enforces it, callers cannot opt out.
 export function useDialer(onFinish?: (info: FinishedCall) => void) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -69,7 +70,7 @@ export function useDialer(onFinish?: (info: FinishedCall) => void) {
     onFinishRef.current?.({ durationSec, callSid });
   }
 
-  async function call(number: string, record: boolean): Promise<void> {
+  async function call(number: string): Promise<void> {
     if (status !== "idle") return;
     setError("");
     setMuted(false);
@@ -82,7 +83,7 @@ export function useDialer(onFinish?: (info: FinishedCall) => void) {
       return;
     }
     try {
-      const c = await device.connect({ params: { To: number, Record: record ? "1" : "0" } });
+      const c = await device.connect({ params: { To: number } });
       callRef.current = c;
       c.on("accept", () => {
         answeredAtRef.current = Date.now();

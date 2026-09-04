@@ -102,7 +102,7 @@ export default function AppointmentsPage() {
     if (dialer.status !== "idle") return;
     activeApptRef.current = a;
     setActiveName(a.prospect_name || a.prospect_business || a.prospect_phone);
-    dialer.call(normalize(a.prospect_phone), true);
+    dialer.call(normalize(a.prospect_phone));
   }
   async function mark(a: Appt, status: string) {
     await fetch(`/api/appointments/${a.id}`, {

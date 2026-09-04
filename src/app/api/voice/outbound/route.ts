@@ -13,7 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // From="client:<agent-id>", and we look up that agent's twilio_number. Falls back
 // to the shared TWILIO_CALLER_ID if the agent has no number assigned yet.
 //
-// Recording is opt-in per call (Record=1 from the console), on by default.
+// Every call is recorded. This is enforced server-side.
 export async function POST(req: NextRequest) {
   const form = await req.formData();
 
@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
   }
 
   const to = String(form.get("To") ?? "").replace(/[^\d+]/g, "");
-  const record = String(form.get("Record") ?? "") === "1";
   const from = String(form.get("From") ?? "");
   const origin = new URL(req.url).origin;
 
@@ -47,11 +46,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const recordAttrs = record
-    ? ` record="record-from-answer-dual"` +
-      ` recordingStatusCallback="${origin}/api/voice/recording"` +
-      ` recordingStatusCallbackEvent="completed"`
-    : "";
+  // Recording is mandatory and decided here, not by the client — a caller
+  // cannot opt out by omitting a parameter.
+  const recordAttrs =
+    ` record="record-from-answer-dual"` +
+    ` recordingStatusCallback="${origin}/api/voice/recording"` +
+    ` recordingStatusCallbackEvent="completed"`;
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

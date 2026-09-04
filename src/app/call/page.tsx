@@ -85,7 +85,6 @@ export default function CallPage() {
   const [tab, setTab] = useState<Tab>("followup");
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [record, setRecord] = useState(true);
   const [dialInput, setDialInput] = useState("");
 
   const [dispo, setDispo] = useState(DISPOSITIONS[0].label);
@@ -191,14 +190,14 @@ export default function CallPage() {
   }
   function callLead(l: Lead) {
     if (status !== "idle") return;
-    selectLead(l); dialer.call(l.phone, record);
+    selectLead(l); dialer.call(l.phone);
   }
   function manualCall() {
     if (status !== "idle") return;
     const number = normalize(dialInput);
     if (!number) return dialer.setError("Enter a valid number, e.g. 201-555-1234");
     setActiveId(null); activeRef.current = null; lastManualRef.current = number;
-    dialer.call(number, record);
+    dialer.call(number);
   }
 
   async function saveDisposition() {
@@ -365,7 +364,7 @@ export default function CallPage() {
           <div>
           <h1>Call Console</h1>
           <div className="sub">
-            Your assigned leads. {dueCount > 0 && <strong className="conv">{dueCount} follow-up{dueCount > 1 ? "s" : ""} due now.</strong>} Recording is {record ? "ON" : "OFF"}.
+            Your assigned leads. {dueCount > 0 && <strong className="conv">{dueCount} follow-up{dueCount > 1 ? "s" : ""} due now.</strong>} All calls are recorded.
           </div>
           </div>
         </div>
@@ -412,10 +411,7 @@ export default function CallPage() {
           </div>
           <input className="search" placeholder="🔎 Search name or number…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <div className="toolbar">
-            <label className="hint" style={{ display: "flex", gap: 8, alignItems: "center", margin: 0 }}>
-              <input type="checkbox" checked={record} disabled={status !== "idle"} onChange={(e) => setRecord(e.target.checked)} />
-              Record
-            </label>
+            <span className="hint" style={{ margin: 0 }}>🔴 Calls are recorded</span>
             <button className="btn-ghost sm" onClick={() => setShowAdd((v) => !v)}>{showAdd ? "Close" : "＋ Add leads"}</button>
           </div>
 
