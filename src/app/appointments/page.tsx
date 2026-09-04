@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtETDay, fmtETTime, fmtETFull, isETToday, etDayStart } from "@/lib/time";
+
 import { useEffect, useRef, useState } from "react";
 import { useDialer } from "@/lib/useDialer";
 import { createClient } from "@/lib/supabase/client";
@@ -34,7 +36,7 @@ function dayLabel(iso: string): string {
   const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   if (same(d, today)) return "Today";
   if (same(d, tom)) return "Tomorrow";
-  return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  return fmtETDay(iso);
 }
 function relTime(iso: string): { text: string; soon: boolean; over: boolean } {
   const diff = new Date(iso).getTime() - Date.now();
@@ -85,7 +87,7 @@ export default function AppointmentsPage() {
       if (body.ok) setAppts(body.appointments as Appt[]);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const since = new Date(); since.setHours(0, 0, 0, 0);
+        const since = etDayStart();
         const { count } = await supabase.from("call_logs").select("id", { count: "exact", head: true }).gte("created_at", since.toISOString());
         setCallsToday(count ?? 0);
       }
@@ -117,7 +119,7 @@ export default function AppointmentsPage() {
   const upcoming = appts.filter((a) => a.status === "scheduled" && match(a));
   const done = appts.filter((a) => a.status !== "scheduled" && match(a));
 
-  const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
+  const isToday = (iso: string) => isETToday(iso);
   const todayCount = appts.filter((a) => a.status === "scheduled" && isToday(a.scheduled_at)).length;
   const wonCount = appts.filter((a) => a.status === "won").length;
   const lostCount = appts.filter((a) => a.status === "lost" || a.status === "no_show").length;
@@ -132,7 +134,7 @@ export default function AppointmentsPage() {
 
   const mm = String(Math.floor(dialer.seconds / 60)).padStart(2, "0");
   const ss = String(dialer.seconds % 60).padStart(2, "0");
-  const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = (iso: string) => fmtETTime(iso);
 
   return (
     <>
@@ -223,7 +225,7 @@ export default function AppointmentsPage() {
               <tbody>
                 {done.map((a) => (
                   <tr key={a.id}>
-                    <td className="nowrap">{new Date(a.scheduled_at).toLocaleString()}</td>
+                    <td className="nowrap">{fmtETFull(a.scheduled_at)}</td>
                     <td>{a.prospect_name || "—"}<br /><span className="ph">{a.prospect_business}</span></td>
                     <td>{a.prospect_phone}</td>
                     <td>{STATUS_LABEL[a.status] ?? a.status}</td>

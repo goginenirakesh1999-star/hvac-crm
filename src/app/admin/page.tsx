@@ -3,6 +3,7 @@ import type { AgentRole } from "@/lib/database.types";
 import LeadManager from "./LeadManager";
 import TeamAccess from "./TeamAccess";
 import Quote from "../Quote";
+import { fmtETFull, etDayStart } from "@/lib/time";
 import SideNav from "../SideNav";
 import BookCall from "../BookCall";
 import "../call/call.css";
@@ -43,8 +44,7 @@ const RANGES: Record<string, { label: string; hours: number }> = {
 function rangeStart(key: string): string {
   const now = new Date();
   if (key === "today") {
-    now.setUTCHours(0, 0, 0, 0);
-    return now.toISOString();
+    return etDayStart(now).toISOString();
   }
   return new Date(Date.now() - RANGES[key].hours * 3600_000).toISOString();
 }
@@ -173,7 +173,7 @@ export default async function AdminPage({
   const detail: CallRow[] = (calls ?? []).slice(0, 300).map((c) => ({
     id: c.id,
     agentName: nameOf.get(c.agent_id) ?? c.agent_id.slice(0, 8),
-    at: new Date(c.created_at).toLocaleString(),
+    at: fmtETFull(c.created_at),
     name: c.dealership_name,
     phone: c.dealership_phone,
     duration: c.duration_seconds ?? 0,
@@ -255,7 +255,7 @@ export default async function AdminPage({
             <tbody>
               {(apptUpcoming ?? []).map((a) => (
                 <tr key={a.id}>
-                  <td className="nowrap">{new Date(a.scheduled_at).toLocaleString()}</td>
+                  <td className="nowrap">{fmtETFull(a.scheduled_at)}</td>
                   <td>{a.prospect_name || "—"}<br /><span className="ph">{a.prospect_business}</span></td>
                   <td>{a.prospect_phone}</td>
                   <td className="notes">{a.notes || "—"}</td>

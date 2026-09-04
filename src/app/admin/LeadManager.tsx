@@ -1,5 +1,7 @@
 "use client";
 
+import { fmtET } from "@/lib/time";
+
 import { useEffect, useState, type ChangeEvent } from "react";
 import type { LeadStatus } from "@/lib/database.types";
 
@@ -57,7 +59,7 @@ function parseRows(text: string): { name?: string; business?: string; phone: str
   return out;
 }
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
+const fmt = (iso: string | null) => fmtET(iso) || "—";
 
 export default function LeadManager({ callers }: { callers: Caller[] }) {
   const [leads, setLeads] = useState<Lead[]>([]);

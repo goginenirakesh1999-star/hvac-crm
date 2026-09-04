@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useDialer } from "@/lib/useDialer";
 import { createClient } from "@/lib/supabase/client";
+import { fmtET, fmtETFull, etDayStart } from "@/lib/time";
 import type { LeadStatus } from "@/lib/database.types";
 import Quote from "../Quote";
 import SideNav from "../SideNav";
@@ -78,7 +79,7 @@ function parseRows(text: string): { name?: string; business?: string; phone: str
   return out;
 }
 const displayName = (l: Lead) => l.business || l.name || l.phone;
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+const fmt = (iso: string | null) => fmtET(iso);
 
 export default function CallPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -163,7 +164,7 @@ export default function CallPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const since = new Date(); since.setHours(0, 0, 0, 0);
+      const since = etDayStart();
       const [{ count }, { data: prof }] = await Promise.all([
         supabase.from("call_logs").select("id", { count: "exact", head: true }).gte("created_at", since.toISOString()),
         supabase.from("profiles").select("daily_call_target").eq("id", user.id).maybeSingle(),
@@ -221,7 +222,7 @@ export default function CallPage() {
     const d = DISPOSITIONS.find((x) => x.label === dispo)!;
     if (d.callback && !callbackWhen) return setMsg("Pick a callback date & time.");
     setMsg("Saving…");
-    const stamped = `[${new Date().toLocaleString()}] ${d.label}${dispoNotes ? ": " + dispoNotes : ""}`;
+    const stamped = `[${fmtETFull(new Date())}] ${d.label}${dispoNotes ? ": " + dispoNotes : ""}`;
     const notes = [lead.notes, stamped].filter(Boolean).join("\n");
     await fetch(`/api/leads/${lead.id}`, {
       method: "PATCH",
@@ -569,7 +570,7 @@ export default function CallPage() {
                 <div key={h.id} className="hist">
                   <div>
                     <div className="nm">{h.outcome || "—"} <span className="ph">· {h.duration_seconds}s</span></div>
-                    <div className="ph">{new Date(h.created_at).toLocaleString()}</div>
+                    <div className="ph">{fmtETFull(h.created_at)}</div>
                     {h.notes && <div className="appt-notes">{h.notes}</div>}
                   </div>
                   {h.twilio_call_sid && <a href={`/api/voice/recording-media?callSid=${h.twilio_call_sid}`} target="_blank" rel="noreferrer">▶ Play</a>}
