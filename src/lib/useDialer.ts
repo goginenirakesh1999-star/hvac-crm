@@ -70,7 +70,7 @@ export function useDialer(onFinish?: (info: FinishedCall) => void) {
     onFinishRef.current?.({ durationSec, callSid });
   }
 
-  async function call(number: string): Promise<void> {
+  async function call(number: string, leadId?: string): Promise<void> {
     if (status !== "idle") return;
     setError("");
     setMuted(false);
@@ -83,7 +83,7 @@ export function useDialer(onFinish?: (info: FinishedCall) => void) {
       return;
     }
     try {
-      const c = await device.connect({ params: { To: number } });
+      const c = await device.connect({ params: { To: number, LeadId: leadId ?? "" } });
       callRef.current = c;
       c.on("accept", () => {
         answeredAtRef.current = Date.now();

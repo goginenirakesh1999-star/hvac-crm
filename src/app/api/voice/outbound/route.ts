@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const to = String(form.get("To") ?? "").replace(/[^\d+]/g, "");
+  const leadId = String(form.get("LeadId") ?? "");
   const from = String(form.get("From") ?? "");
   const origin = new URL(req.url).origin;
 
@@ -53,9 +54,15 @@ export async function POST(req: NextRequest) {
     ` recordingStatusCallback="${origin}/api/voice/recording"` +
     ` recordingStatusCallbackEvent="completed"`;
 
+  // Every call reports its own ending here, so the CRM is complete even if the
+  // rep's browser never gets the chance to log it.
+  const statusUrl =
+    `${origin}/api/voice/dial-status?agent=${encodeURIComponent(agentId)}` +
+    (leadId ? `&lead=${encodeURIComponent(leadId)}` : "");
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${callerId}" answerOnBridge="true"${recordAttrs}>
+  <Dial callerId="${callerId}" answerOnBridge="true" action="${statusUrl}" method="POST"${recordAttrs}>
     <Number>${to}</Number>
   </Dial>
 </Response>`;

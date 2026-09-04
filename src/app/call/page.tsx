@@ -205,7 +205,7 @@ export default function CallPage() {
   }
   function callLead(l: Lead) {
     if (status !== "idle") return;
-    selectLead(l); dialer.call(l.phone);
+    selectLead(l); dialer.call(l.phone, l.id);
   }
   function manualCall() {
     if (status !== "idle") return;
