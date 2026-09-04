@@ -130,7 +130,22 @@ export default function CallPage() {
       setCallsToday((n) => n + 1);
       return;
     }
+    // Log the call the instant it ends. The disposition below updates this same
+    // row (matched on CallSid), so a call is never lost when a rep skips it.
     setLastCall({ durationSec, callSid });
+    fetch("/api/calls/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dealership_name: displayName(lead),
+        dealership_phone: lead.phone,
+        twilio_call_sid: callSid,
+        status: durationSec > 0 ? "completed" : "no-answer",
+        duration_seconds: durationSec,
+        lead_id: lead.id,
+      }),
+    }).catch(() => {});
+    setCallsToday((n) => n + 1);
   });
   const { status } = dialer;
 
@@ -228,7 +243,6 @@ export default function CallPage() {
       }),
     });
     setActiveId(null); activeRef.current = null; setLastCall(null); setMsg("");
-    if (lastCall) setCallsToday((n) => n + 1);
     loadLeads();
   }
 
