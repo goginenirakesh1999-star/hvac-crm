@@ -14,6 +14,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // to the shared TWILIO_CALLER_ID if the agent has no number assigned yet.
 //
 // Every call is recorded. This is enforced server-side.
+// TwiML is XML: any value interpolated into an attribute must be escaped, or a
+// bare "&" in a query string is read as an entity and Twilio rejects the whole
+// document with "an application error has occurred".
+function xmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function POST(req: NextRequest) {
   const form = await req.formData();
 
@@ -51,19 +62,20 @@ export async function POST(req: NextRequest) {
   // cannot opt out by omitting a parameter.
   const recordAttrs =
     ` record="record-from-answer-dual"` +
-    ` recordingStatusCallback="${origin}/api/voice/recording"` +
+    ` recordingStatusCallback="${xmlAttr(origin + "/api/voice/recording")}"` +
     ` recordingStatusCallbackEvent="completed"`;
 
   // Every call reports its own ending here, so the CRM is complete even if the
   // rep's browser never gets the chance to log it.
-  const statusUrl =
+  const statusUrl = xmlAttr(
     `${origin}/api/voice/dial-status?agent=${encodeURIComponent(agentId)}` +
-    (leadId ? `&lead=${encodeURIComponent(leadId)}` : "");
+      (leadId ? `&lead=${encodeURIComponent(leadId)}` : "")
+  );
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${callerId}" answerOnBridge="true" action="${statusUrl}" method="POST"${recordAttrs}>
-    <Number>${to}</Number>
+  <Dial callerId="${xmlAttr(callerId)}" answerOnBridge="true" action="${statusUrl}" method="POST"${recordAttrs}>
+    <Number>${xmlAttr(to)}</Number>
   </Dial>
 </Response>`;
 
